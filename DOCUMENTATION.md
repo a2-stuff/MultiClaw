@@ -493,15 +493,22 @@ Plugins extend an agent's core functionality with integrations such as Docker ma
 - The dashboard maintains a central **plugin registry** seeded with default plugins at startup
 - Admins can add new plugins to the registry by providing a GitHub repository URL
 
-**Available plugins:**
+**Plugin Registry:**
 
-| Plugin | Description | Key Features |
-|--------|-------------|--------------|
-| **Browser Control** | Browser automation via Playwright | Navigate pages, fill forms, click elements, take screenshots, extract text/HTML, manage tabs, handle cookies, emulate devices. 19 agent-facing tools. Supports Chromium, Firefox, and WebKit. Configurable viewport, user agent, URL allowlists/blocklists, and JavaScript execution policy. |
-| **Docker** | Install and manage Docker containers on the agent host | Pull images, create/start/stop/remove containers, inspect container state, list containers and images, manage volumes and networks. |
-| **Portainer** | Install Portainer CE Docker management UI | Automated Portainer CE installation and setup, providing a web-based GUI for Docker container management on the agent host. |
-| **Tailscale** | Tailscale VPN mesh networking | Secure zero-config networking between agents and dashboard. Automatic peer discovery, ACL tag management, and support for dual-stack or Tailscale-only networking modes. |
-| **Hello Plugin** | Minimal example / template plugin | Demonstrates the plugin interface (entry point, plugin.json structure, tool registration). Use as a starting point for building custom plugins. |
+The dashboard ships with a built-in plugin registry seeded with the following plugins. Admins can add additional plugins by providing a GitHub repository URL.
+
+| Plugin | Author | Type | Description |
+|--------|--------|------|-------------|
+| **Superpowers** | Jesse Vincent | git-plugin | Complete development workflow skills for AI coding agents — TDD, systematic debugging, brainstorming, code review, parallel agents, and more |
+| **Shannon** | KeygraphHQ | git-plugin | Autonomous white-box AI pentester for web applications and APIs — analyzes source code, identifies attack vectors, and executes real exploits to prove vulnerabilities |
+| **AgentPay SDK** | World Liberty Financial | git-plugin | Open SDK for agentic payments — let AI agents hold, transfer, and manage USD1 with operator-defined spending policies and self-custodial wallets on EVM-compatible networks |
+| **AgentPay Skill Pack** | World Liberty Financial | git-plugin | AI agent skill pack for wallet setup, funding, transfers, approvals, and policy configuration with AgentPay SDK — enables agents to manage USD1 payment workflows |
+| **Bankr Agent** | BankrBot | git-plugin | Crypto trading, market analysis, and Polymarket prediction betting via the Bankr API — supports Base, Ethereum, Solana, and more |
+| **Browser Control** | MultiClaw | built-in | Browser automation via Playwright — navigate pages, fill forms, click elements, extract content, take screenshots, and manage tabs with 19 agent-facing tools. Supports Chromium, Firefox, and WebKit with configurable headless/visible mode |
+| **Docker** | MultiClaw | built-in | Install and manage Docker containers on the agent host — pull images, create/start/stop/remove containers, inspect state, and control container lifecycle |
+| **Portainer** | MultiClaw | built-in | Install Portainer CE Docker management UI on the agent host for visual container management via a web-based GUI |
+| **Tailscale** | MultiClaw | built-in | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery |
+| **Hello Plugin** | MultiClaw | built-in | Minimal example plugin demonstrating the plugin interface — use as a starting point for building custom plugins |
 
 **Installing a plugin on an agent:**
 

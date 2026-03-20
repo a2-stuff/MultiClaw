@@ -236,15 +236,20 @@ Skills are deployed per agent from the marketplace UI.
 
 Plugins extend the agent runtime itself — adding new endpoints, integrations, or background services. The git-based plugin registry lets you browse, clone, and install plugins on any connected agent. Post-install scripts run automatically after installation. Plugins can be individually enabled or disabled per agent.
 
-**Available plugins:**
+**Plugin Registry:**
 
-| Plugin | Description |
-|--------|-------------|
-| **Browser Control** | Browser automation via Playwright — navigate, fill forms, take screenshots, extract content, and more with 19 agent-facing tools. Supports Chromium, Firefox, and WebKit in headless or headed mode. |
-| **Docker** | Install and manage Docker containers on the agent host — pull images, run containers, inspect state, and control lifecycle. |
-| **Portainer** | Install Portainer CE, the Docker management web UI, on the agent host for visual container management. |
-| **Tailscale** | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery. |
-| **Hello Plugin** | Minimal example plugin demonstrating the plugin interface — useful as a template for building custom plugins. |
+| Plugin | Author | Description |
+|--------|--------|-------------|
+| **Superpowers** | Jesse Vincent | Complete development workflow skills for AI coding agents — TDD, systematic debugging, brainstorming, code review, parallel agents, and more |
+| **Shannon** | KeygraphHQ | Autonomous white-box AI pentester for web applications and APIs — analyzes source code, identifies attack vectors, and executes real exploits |
+| **AgentPay SDK** | World Liberty Financial | Open SDK for agentic payments — let AI agents hold, transfer, and manage USD1 with operator-defined spending policies |
+| **AgentPay Skill Pack** | World Liberty Financial | AI agent skill pack for wallet setup, funding, transfers, approvals, and policy configuration with AgentPay SDK |
+| **Bankr Agent** | BankrBot | Crypto trading, market analysis, and Polymarket prediction betting via the Bankr API — supports Base, Ethereum, Solana, and more |
+| **Browser Control** | MultiClaw | Browser automation via Playwright — navigate, fill forms, take screenshots, extract content, and manage tabs with 19 agent-facing tools |
+| **Docker** | MultiClaw | Install and manage Docker containers on the agent host — pull images, create/start/stop/remove containers, and control lifecycle |
+| **Portainer** | MultiClaw | Install Portainer CE Docker management UI on the agent host for visual container management |
+| **Tailscale** | MultiClaw | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery |
+| **Hello Plugin** | MultiClaw | Minimal example plugin demonstrating the plugin interface — use as a template for building custom plugins |
 
 ### Crons
 

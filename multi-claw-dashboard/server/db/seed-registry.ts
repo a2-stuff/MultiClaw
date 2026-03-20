@@ -117,6 +117,82 @@ export function seedPluginRegistry() {
     }).run();
   }
 
+  // Seed Docker plugin
+  const docker = db
+    .select()
+    .from(pluginRegistry)
+    .where(sql`${pluginRegistry.slug} = 'docker'`)
+    .get();
+  if (!docker) {
+    db.insert(pluginRegistry).values({
+      id: uuid(),
+      name: "Docker",
+      slug: "docker",
+      description: "Install and manage Docker containers on the agent host. Pull images, create/start/stop/remove containers, inspect state, and control container lifecycle.",
+      version: "1.0.0",
+      author: "MultiClaw",
+      repoUrl: "https://github.com/a2-stuff/MultiClaw",
+      type: "built-in",
+    }).run();
+  }
+
+  // Seed Portainer plugin
+  const portainer = db
+    .select()
+    .from(pluginRegistry)
+    .where(sql`${pluginRegistry.slug} = 'portainer'`)
+    .get();
+  if (!portainer) {
+    db.insert(pluginRegistry).values({
+      id: uuid(),
+      name: "Portainer",
+      slug: "portainer",
+      description: "Install Portainer CE Docker management UI on the agent host for visual container management via a web-based GUI.",
+      version: "1.0.0",
+      author: "MultiClaw",
+      repoUrl: "https://github.com/a2-stuff/MultiClaw",
+      type: "built-in",
+    }).run();
+  }
+
+  // Seed Tailscale plugin
+  const tailscale = db
+    .select()
+    .from(pluginRegistry)
+    .where(sql`${pluginRegistry.slug} = 'tailscale'`)
+    .get();
+  if (!tailscale) {
+    db.insert(pluginRegistry).values({
+      id: uuid(),
+      name: "Tailscale",
+      slug: "tailscale",
+      description: "Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery.",
+      version: "1.0.0",
+      author: "MultiClaw",
+      repoUrl: "https://github.com/a2-stuff/MultiClaw",
+      type: "built-in",
+    }).run();
+  }
+
+  // Seed Hello Plugin
+  const hello = db
+    .select()
+    .from(pluginRegistry)
+    .where(sql`${pluginRegistry.slug} = 'hello-plugin'`)
+    .get();
+  if (!hello) {
+    db.insert(pluginRegistry).values({
+      id: uuid(),
+      name: "Hello Plugin",
+      slug: "hello-plugin",
+      description: "Minimal example plugin demonstrating the plugin interface. Use as a template for building custom plugins.",
+      version: "1.0.0",
+      author: "MultiClaw",
+      repoUrl: "https://github.com/a2-stuff/MultiClaw",
+      type: "built-in",
+    }).run();
+  }
+
   // Seed skills.sh provider
   const skillssh = db
     .select()
