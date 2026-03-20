@@ -7,6 +7,8 @@ BLUE='\033[0;34m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
 
+RED='\033[0;31m'
+
 echo -e "${BOLD}${BLUE}"
 echo "  __  __       _ _   _  ____ _"
 echo " |  \/  |_   _| | |_(_)/ ___| | __ ___      __"
@@ -15,6 +17,218 @@ echo " | |  | | |_| | | |_| | |___| | (_| |\ V  V /"
 echo " |_|  |_|\__,_|_|\__|_|\____|_|\__,_| \_/\_/"
 echo -e "${NC}"
 echo ""
+
+# ---------------------------------------------------------------------------
+# Dependency detection & installation helpers
+# ---------------------------------------------------------------------------
+
+# Detect package manager
+detect_pkg_manager() {
+  if command -v apt-get &> /dev/null; then
+    PKG_MGR="apt"
+  elif command -v dnf &> /dev/null; then
+    PKG_MGR="dnf"
+  elif command -v pacman &> /dev/null; then
+    PKG_MGR="pacman"
+  elif command -v brew &> /dev/null; then
+    PKG_MGR="brew"
+  else
+    PKG_MGR=""
+  fi
+}
+
+pkg_install() {
+  local pkg_apt="${1}"
+  local pkg_dnf="${2:-$1}"
+  local pkg_pacman="${3:-$1}"
+  local pkg_brew="${4:-$1}"
+
+  case "$PKG_MGR" in
+    apt)    sudo apt-get update -qq && sudo apt-get install -y -qq "$pkg_apt" ;;
+    dnf)    sudo dnf install -y "$pkg_dnf" ;;
+    pacman) sudo pacman -S --noconfirm "$pkg_pacman" ;;
+    brew)   brew install "$pkg_brew" ;;
+    *)
+      echo -e "${RED}No supported package manager found. Please install '$pkg_apt' manually.${NC}"
+      return 1
+      ;;
+  esac
+}
+
+# Check a command exists; if not, offer to install
+require_cmd() {
+  local cmd="$1"
+  local pkg_apt="${2:-$1}"
+  local pkg_dnf="${3:-$2}"
+  local pkg_pacman="${4:-$2}"
+  local pkg_brew="${5:-$2}"
+  local manual_url="${6:-}"
+
+  if command -v "$cmd" &> /dev/null; then
+    return 0
+  fi
+
+  echo -e "${YELLOW}Required dependency '${cmd}' not found.${NC}"
+  if [[ -n "$PKG_MGR" ]]; then
+    read -p "  Install ${cmd} automatically? (Y/n): " auto_install
+    if [[ ! "$auto_install" =~ ^[Nn]$ ]]; then
+      echo "  Installing ${cmd}..."
+      if pkg_install "$pkg_apt" "$pkg_dnf" "$pkg_pacman" "$pkg_brew"; then
+        echo -e "  ${GREEN}${cmd} installed.${NC}"
+        return 0
+      fi
+    fi
+  fi
+
+  if [[ -n "$manual_url" ]]; then
+    echo -e "${RED}${cmd} is required. Install it from: ${manual_url}${NC}"
+  else
+    echo -e "${RED}${cmd} is required. Please install it and re-run the installer.${NC}"
+  fi
+  exit 1
+}
+
+# Check minimum version (major.minor) — usage: check_version "node" "20.0" "$(node -v)"
+check_version() {
+  local name="$1"
+  local required="$2"
+  local current="$3"
+
+  # Strip leading 'v' or 'Python ' prefix
+  current="${current#v}"
+  current="${current#Python }"
+  current="$(echo "$current" | grep -oE '^[0-9]+\.[0-9]+')"
+
+  local req_major req_minor cur_major cur_minor
+  req_major="${required%%.*}"
+  req_minor="${required#*.}"
+  cur_major="${current%%.*}"
+  cur_minor="${current#*.}"
+
+  if (( cur_major > req_major )) || { (( cur_major == req_major )) && (( cur_minor >= req_minor )); }; then
+    return 0
+  fi
+
+  echo -e "${RED}${name} version ${required}+ is required, but found ${current}.${NC}"
+  echo "  Please upgrade ${name} and re-run the installer."
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Dependency checks for Dashboard
+# ---------------------------------------------------------------------------
+check_dashboard_deps() {
+  echo -e "${BOLD}Checking dashboard dependencies...${NC}"
+  local ok=true
+
+  detect_pkg_manager
+
+  # Node.js 20+
+  require_cmd "node" "nodejs" "nodejs" "nodejs" "node" "https://nodejs.org"
+  local node_ver
+  node_ver="$(node -v 2>/dev/null)"
+  check_version "Node.js" "20.0" "$node_ver"
+  echo -e "  ${GREEN}Node.js ${node_ver}${NC}"
+
+  # npm (comes with node, but verify)
+  require_cmd "npm" "npm" "npm" "npm" "npm"
+  echo -e "  ${GREEN}npm $(npm -v 2>/dev/null)${NC}"
+
+  # npx (part of npm)
+  if ! command -v npx &> /dev/null; then
+    echo -e "${RED}npx not found (should come with npm). Please reinstall Node.js.${NC}"
+    exit 1
+  fi
+
+  # git (needed for plugin cloning, general usage)
+  require_cmd "git" "git" "git" "git" "git"
+  echo -e "  ${GREEN}git $(git --version 2>/dev/null | awk '{print $3}')${NC}"
+
+  echo -e "${GREEN}All dashboard dependencies satisfied.${NC}"
+  echo ""
+}
+
+# ---------------------------------------------------------------------------
+# Dependency checks for Agent
+# ---------------------------------------------------------------------------
+check_agent_deps() {
+  echo -e "${BOLD}Checking agent dependencies...${NC}"
+
+  detect_pkg_manager
+
+  # Python 3.11+
+  require_cmd "python3" "python3" "python3" "python" "python3" "https://www.python.org"
+  local py_ver
+  py_ver="$(python3 --version 2>/dev/null)"
+  check_version "Python" "3.11" "$py_ver"
+  echo -e "  ${GREEN}${py_ver}${NC}"
+
+  # pip
+  if ! python3 -m pip --version &> /dev/null; then
+    echo -e "${YELLOW}pip not found.${NC}"
+    if [[ -n "$PKG_MGR" ]]; then
+      read -p "  Install pip automatically? (Y/n): " auto_install
+      if [[ ! "$auto_install" =~ ^[Nn]$ ]]; then
+        case "$PKG_MGR" in
+          apt)    sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip ;;
+          dnf)    sudo dnf install -y python3-pip ;;
+          pacman) sudo pacman -S --noconfirm python-pip ;;
+          brew)   echo "pip should come with Python via Homebrew." ;;
+        esac
+        if python3 -m pip --version &> /dev/null; then
+          echo -e "  ${GREEN}pip installed.${NC}"
+        else
+          echo -e "${RED}pip is required. Please install it and re-run.${NC}"
+          exit 1
+        fi
+      else
+        echo -e "${RED}pip is required. Please install it and re-run.${NC}"
+        exit 1
+      fi
+    else
+      echo -e "${RED}pip is required. Install it with: python3 -m ensurepip --upgrade${NC}"
+      exit 1
+    fi
+  fi
+  echo -e "  ${GREEN}pip $(python3 -m pip --version 2>/dev/null | awk '{print $2}')${NC}"
+
+  # venv module
+  if ! python3 -m venv --help &> /dev/null 2>&1; then
+    echo -e "${YELLOW}Python venv module not found.${NC}"
+    if [[ -n "$PKG_MGR" ]]; then
+      read -p "  Install python3-venv automatically? (Y/n): " auto_install
+      if [[ ! "$auto_install" =~ ^[Nn]$ ]]; then
+        case "$PKG_MGR" in
+          apt)    sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv ;;
+          dnf)    echo "venv is included with python3 on Fedora." ;;
+          pacman) echo "venv is included with python on Arch." ;;
+          brew)   echo "venv is included with Python via Homebrew." ;;
+        esac
+        if python3 -m venv --help &> /dev/null 2>&1; then
+          echo -e "  ${GREEN}venv module available.${NC}"
+        else
+          echo -e "${RED}venv module is required. Please install python3-venv and re-run.${NC}"
+          exit 1
+        fi
+      else
+        echo -e "${RED}venv module is required.${NC}"
+        exit 1
+      fi
+    else
+      echo -e "${RED}Python venv module is required. Install python3-venv and re-run.${NC}"
+      exit 1
+    fi
+  else
+    echo -e "  ${GREEN}venv module available${NC}"
+  fi
+
+  # git
+  require_cmd "git" "git" "git" "git" "git"
+  echo -e "  ${GREEN}git $(git --version 2>/dev/null | awk '{print $3}')${NC}"
+
+  echo -e "${GREEN}All agent dependencies satisfied.${NC}"
+  echo ""
+}
 
 # ---------------------------------------------------------------------------
 # Tailscale setup wizard
@@ -225,10 +439,7 @@ read -p "Enter choice [1/2]: " choice
 case $choice in
   1)
     echo -e "\n${GREEN}Installing MultiClaw Dashboard...${NC}\n"
-    if ! command -v node &> /dev/null; then
-      echo "Node.js is required. Install it from https://nodejs.org"
-      exit 1
-    fi
+    check_dashboard_deps
     cd multi-claw-dashboard
     echo "Installing dependencies..."
     npm install
@@ -368,10 +579,7 @@ TLSEOF
     ;;
   2)
     echo -e "\n${GREEN}Installing MultiClaw Agent...${NC}\n"
-    if ! command -v python3 &> /dev/null; then
-      echo "Python 3.11+ is required."
-      exit 1
-    fi
+    check_agent_deps
     cd multi-claw-agent
 
     echo "Creating virtual environment..."
