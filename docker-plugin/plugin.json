@@ -1,7 +1,0 @@
-{
-  "name": "docker",
-  "description": "Install and manage Docker containers on the agent host",
-  "version": "1.0.0",
-  "entry_point": "main.py",
-  "enabled": true
-}

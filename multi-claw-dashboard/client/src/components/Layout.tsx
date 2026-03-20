@@ -24,6 +24,7 @@ export function Layout({ children, onLogout }: { children: ReactNode; onLogout: 
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-gray-800 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
+          <img src="/multiclaw-icon.png" alt="MultiClaw" className="h-8 w-8 rounded" />
           <h1 className="text-xl font-bold">MultiClaw</h1>
           <div className="flex gap-4">
             {nav.map((item) => (
