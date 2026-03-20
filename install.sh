@@ -430,11 +430,12 @@ setup_tailscale() {
   echo ""
 }
 
-echo "What would you like to install?"
-echo "  1) Dashboard (control hub)"
-echo "  2) Agent (lightweight worker)"
+echo "What would you like to do?"
+echo "  1) Install Dashboard (control hub)"
+echo "  2) Install Agent (lightweight worker)"
+echo "  3) Uninstall MultiClaw (remove everything)"
 echo ""
-read -p "Enter choice [1/2]: " choice
+read -p "Enter choice [1/2/3]: " choice
 
 case $choice in
   1)
@@ -724,8 +725,172 @@ TLSEOF
     echo ""
     echo "  The agent will automatically connect to the dashboard on startup."
     ;;
+  3)
+    echo ""
+    echo -e "${RED}${BOLD}━━━ MultiClaw Uninstaller ━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}This will completely remove MultiClaw from this system:${NC}"
+    echo "  - Stop and remove systemd services (multiclaw-dashboard, multiclaw-agent)"
+    echo "  - Remove spawned local agents (~/.multiclaw/agents/)"
+    echo "  - Remove dashboard data (database, node_modules, build artifacts)"
+    echo "  - Remove agent virtual environment"
+    echo "  - Remove .env configuration files"
+    echo "  - Remove certbot renewal cron entries (if any)"
+    echo ""
+    echo -e "${RED}${BOLD}This action is irreversible. All data will be lost.${NC}"
+    echo ""
+    read -p "Type 'UNINSTALL' to confirm: " confirm_uninstall
+    if [[ "$confirm_uninstall" != "UNINSTALL" ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    ERRORS=0
+
+    # -----------------------------------------------------------------------
+    # 1. Stop and remove systemd services
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Stopping services...${NC}"
+    for svc in multiclaw-dashboard multiclaw-agent; do
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        sudo systemctl stop "$svc" && echo -e "  ${GREEN}Stopped ${svc}${NC}" || { echo -e "  ${YELLOW}Failed to stop ${svc}${NC}"; ERRORS=$((ERRORS+1)); }
+      else
+        echo -e "  ${svc} not running"
+      fi
+      if systemctl is-enabled --quiet "$svc" 2>/dev/null; then
+        sudo systemctl disable "$svc" 2>/dev/null && echo -e "  ${GREEN}Disabled ${svc}${NC}" || true
+      fi
+      if [[ -f "/etc/systemd/system/${svc}.service" ]]; then
+        sudo rm -f "/etc/systemd/system/${svc}.service" && echo -e "  ${GREEN}Removed /etc/systemd/system/${svc}.service${NC}" || { echo -e "  ${YELLOW}Failed to remove unit file${NC}"; ERRORS=$((ERRORS+1)); }
+      fi
+    done
+    sudo systemctl daemon-reload 2>/dev/null
+    echo -e "  ${GREEN}Reloaded systemd daemon${NC}"
+
+    # -----------------------------------------------------------------------
+    # 2. Kill any remaining MultiClaw processes
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Stopping remaining processes...${NC}"
+    # Dashboard processes
+    if [[ -f "${SCRIPT_DIR}/multi-claw-dashboard/.env" ]]; then
+      DASH_PORT=$(grep -E '^PORT=' "${SCRIPT_DIR}/multi-claw-dashboard/.env" 2>/dev/null | cut -d= -f2)
+      if [[ -n "$DASH_PORT" ]]; then
+        DASH_PIDS=$(sudo lsof -ti:"${DASH_PORT}" 2>/dev/null || true)
+        if [[ -n "$DASH_PIDS" ]]; then
+          echo "$DASH_PIDS" | xargs kill 2>/dev/null || true
+          echo -e "  ${GREEN}Killed dashboard processes on port ${DASH_PORT}${NC}"
+        fi
+      fi
+    fi
+    # Agent processes on common ports
+    for port in 8100 8101 8102 8103 8104 8105; do
+      AGENT_PIDS=$(sudo lsof -ti:"${port}" 2>/dev/null || true)
+      if [[ -n "$AGENT_PIDS" ]]; then
+        # Only kill if it looks like a multiclaw agent
+        for pid in $AGENT_PIDS; do
+          CMDLINE=$(ps -p "$pid" -o cmd= 2>/dev/null || true)
+          if echo "$CMDLINE" | grep -q "multiclaw\|multi-claw\|multi_claw" 2>/dev/null; then
+            kill "$pid" 2>/dev/null && echo -e "  ${GREEN}Killed agent process ${pid} on port ${port}${NC}" || true
+          fi
+        done
+      fi
+    done
+
+    # -----------------------------------------------------------------------
+    # 3. Remove spawned local agents
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Removing spawned agents...${NC}"
+    MULTICLAW_HOME="${HOME}/.multiclaw"
+    if [[ -d "${MULTICLAW_HOME}/agents" ]]; then
+      AGENT_COUNT=$(find "${MULTICLAW_HOME}/agents" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l)
+      rm -rf "${MULTICLAW_HOME}/agents"
+      echo -e "  ${GREEN}Removed ${AGENT_COUNT} spawned agent(s) from ${MULTICLAW_HOME}/agents/${NC}"
+    else
+      echo "  No spawned agents found"
+    fi
+    # Remove ~/.multiclaw if empty
+    if [[ -d "${MULTICLAW_HOME}" ]]; then
+      rmdir "${MULTICLAW_HOME}" 2>/dev/null && echo -e "  ${GREEN}Removed ${MULTICLAW_HOME}/${NC}" || echo "  ${MULTICLAW_HOME}/ has other contents, keeping it"
+    fi
+
+    # -----------------------------------------------------------------------
+    # 4. Remove dashboard data
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Cleaning dashboard...${NC}"
+    DASH_DIR="${SCRIPT_DIR}/multi-claw-dashboard"
+    if [[ -d "$DASH_DIR" ]]; then
+      rm -f  "${DASH_DIR}/.env"                 && echo -e "  ${GREEN}Removed dashboard .env${NC}"
+      rm -rf "${DASH_DIR}/node_modules"          && echo -e "  ${GREEN}Removed dashboard node_modules${NC}"
+      rm -rf "${DASH_DIR}/client/node_modules"   && echo -e "  ${GREEN}Removed client node_modules${NC}"
+      rm -rf "${DASH_DIR}/client/dist"           && echo -e "  ${GREEN}Removed client dist${NC}"
+      rm -rf "${DASH_DIR}/data"                  && echo -e "  ${GREEN}Removed dashboard database${NC}"
+    else
+      echo "  Dashboard directory not found, skipping"
+    fi
+
+    # -----------------------------------------------------------------------
+    # 5. Remove agent data
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Cleaning agent...${NC}"
+    AGENT_DIR="${SCRIPT_DIR}/multi-claw-agent"
+    if [[ -d "$AGENT_DIR" ]]; then
+      rm -f  "${AGENT_DIR}/.env"                && echo -e "  ${GREEN}Removed agent .env${NC}"
+      rm -rf "${AGENT_DIR}/.venv"               && echo -e "  ${GREEN}Removed agent virtualenv${NC}"
+      rm -rf "${AGENT_DIR}/__pycache__"         && echo -e "  ${GREEN}Removed agent __pycache__${NC}"
+      rm -rf "${AGENT_DIR}/src/__pycache__"     && echo -e "  ${GREEN}Removed src __pycache__${NC}"
+      rm -rf "${AGENT_DIR}/cron_runs"           && echo -e "  ${GREEN}Removed cron run history${NC}"
+      # Clean plugin caches
+      find "${AGENT_DIR}/plugins" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+      echo -e "  ${GREEN}Removed plugin caches${NC}"
+    else
+      echo "  Agent directory not found, skipping"
+    fi
+
+    # -----------------------------------------------------------------------
+    # 6. Remove certbot renewal cron (if present)
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}Cleaning up cron entries...${NC}"
+    if crontab -l 2>/dev/null | grep -q "multiclaw"; then
+      crontab -l 2>/dev/null | grep -v "multiclaw" | crontab - 2>/dev/null
+      echo -e "  ${GREEN}Removed MultiClaw certbot cron entries${NC}"
+    else
+      echo "  No MultiClaw cron entries found"
+    fi
+
+    # -----------------------------------------------------------------------
+    # 7. Optionally remove the entire repository
+    # -----------------------------------------------------------------------
+    echo ""
+    read -p "Also delete the entire MultiClaw repository (${SCRIPT_DIR})? (y/N): " delete_repo
+    if [[ "$delete_repo" =~ ^[Yy]$ ]]; then
+      echo -e "${YELLOW}Deleting ${SCRIPT_DIR} ...${NC}"
+      cd /
+      rm -rf "${SCRIPT_DIR}"
+      echo -e "${GREEN}Repository deleted.${NC}"
+    else
+      echo "  Repository kept at ${SCRIPT_DIR}"
+    fi
+
+    # -----------------------------------------------------------------------
+    # Done
+    # -----------------------------------------------------------------------
+    echo ""
+    if [[ $ERRORS -eq 0 ]]; then
+      echo -e "${GREEN}${BOLD}MultiClaw has been completely uninstalled.${NC}"
+    else
+      echo -e "${YELLOW}${BOLD}MultiClaw uninstalled with ${ERRORS} warning(s). Check output above.${NC}"
+    fi
+    echo ""
+    ;;
   *)
-    echo "Invalid choice. Please enter 1 or 2."
+    echo "Invalid choice. Please enter 1, 2, or 3."
     exit 1
     ;;
 esac
