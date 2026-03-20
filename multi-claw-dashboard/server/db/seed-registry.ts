@@ -98,6 +98,25 @@ export function seedPluginRegistry() {
     }).run();
   }
 
+  // Seed Browser Control plugin
+  const browserControl = db
+    .select()
+    .from(pluginRegistry)
+    .where(sql`${pluginRegistry.slug} = 'browser-control'`)
+    .get();
+  if (!browserControl) {
+    db.insert(pluginRegistry).values({
+      id: uuid(),
+      name: "Browser Control",
+      slug: "browser-control",
+      description: "Browser automation via Playwright. Navigate pages, fill forms, click elements, extract content, take screenshots, and manage tabs — all from agent tasks. Supports Chromium, Firefox, and WebKit with configurable headless/visible mode.",
+      version: "1.0.0",
+      author: "MultiClaw",
+      repoUrl: "https://github.com/a2-stuff/MultiClaw",
+      type: "built-in",
+    }).run();
+  }
+
   // Seed skills.sh provider
   const skillssh = db
     .select()
