@@ -1,0 +1,8 @@
+{
+  "name": "Docker Essentials",
+  "description": "Essential Docker commands and workflows for container management, image operations, and debugging.",
+  "version": "1.0.0",
+  "skill_type": "instruction",
+  "entry_point": null,
+  "installed_at": "2026-03-20T01:06:27.542551+00:00"
+}

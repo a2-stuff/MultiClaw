@@ -1,0 +1,523 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+echo -e "${BOLD}${BLUE}"
+echo "  __  __       _ _   _  ____ _"
+echo " |  \/  |_   _| | |_(_)/ ___| | __ ___      __"
+echo " | |\/| | | | | | __| | |   | |/ _\` \ \ /\ / /"
+echo " | |  | | |_| | | |_| | |___| | (_| |\ V  V /"
+echo " |_|  |_|\__,_|_|\__|_|\____|_|\__,_| \_/\_/"
+echo -e "${NC}"
+echo ""
+
+# ---------------------------------------------------------------------------
+# Tailscale setup wizard
+# Usage: setup_tailscale "dashboard" | "agent"
+# Sets globals: TAILSCALE_ENABLED, TAILSCALE_MODE, TAILSCALE_TAG
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# TLS certificate setup wizard (certbot / Let's Encrypt)
+# Usage: setup_tls "dashboard" | "agent"
+# Sets globals: TLS_CERT_PATH, TLS_KEY_PATH
+# ---------------------------------------------------------------------------
+setup_tls() {
+  local role="${1}"
+  TLS_CERT_PATH=""
+  TLS_KEY_PATH=""
+
+  echo ""
+  read -p "Set up TLS/HTTPS with Let's Encrypt (certbot)? (y/n): " tls_enable
+  if [[ ! "$tls_enable" =~ ^[Yy]$ ]]; then
+    echo "Skipping TLS setup. You can configure it later in .env."
+    return
+  fi
+
+  # Check for existing certificates
+  read -p "Do you already have TLS certificates? (y/n): " has_certs
+  if [[ "$has_certs" =~ ^[Yy]$ ]]; then
+    read -p "Path to certificate file (fullchain.pem): " TLS_CERT_PATH
+    read -p "Path to private key file (privkey.pem): " TLS_KEY_PATH
+    if [[ ! -f "$TLS_CERT_PATH" ]]; then
+      echo -e "${YELLOW}Warning: Certificate file not found at ${TLS_CERT_PATH}${NC}"
+    fi
+    if [[ ! -f "$TLS_KEY_PATH" ]]; then
+      echo -e "${YELLOW}Warning: Key file not found at ${TLS_KEY_PATH}${NC}"
+    fi
+    echo -e "${GREEN}TLS configured with existing certificates.${NC}"
+    return
+  fi
+
+  # Install certbot if not present
+  if ! command -v certbot &> /dev/null; then
+    echo "Certbot not found. Installing..."
+    if command -v apt-get &> /dev/null; then
+      sudo apt-get update -qq && sudo apt-get install -y -qq certbot
+    elif command -v dnf &> /dev/null; then
+      sudo dnf install -y certbot
+    elif command -v pacman &> /dev/null; then
+      sudo pacman -S --noconfirm certbot
+    elif command -v snap &> /dev/null; then
+      sudo snap install --classic certbot
+      sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+    else
+      echo -e "${YELLOW}Could not auto-install certbot. Install it manually:${NC}"
+      echo "  https://certbot.eff.org/instructions"
+      echo ""
+      read -p "Press Enter after installing certbot, or Ctrl+C to skip TLS..."
+      if ! command -v certbot &> /dev/null; then
+        echo "Certbot still not found. Skipping TLS."
+        return
+      fi
+    fi
+  fi
+  echo "Certbot version: $(certbot --version 2>&1)"
+
+  # Get domain
+  echo ""
+  echo -e "${YELLOW}You need a domain name pointing to this server's public IP.${NC}"
+  echo "Certbot will verify domain ownership via HTTP challenge (port 80 must be accessible)."
+  echo ""
+  read -p "Domain name (e.g. multiclaw.example.com): " DOMAIN
+  if [[ -z "$DOMAIN" ]]; then
+    echo "No domain provided. Skipping TLS."
+    return
+  fi
+
+  read -p "Email for Let's Encrypt notifications: " LE_EMAIL
+  if [[ -z "$LE_EMAIL" ]]; then
+    echo "Email required for Let's Encrypt. Skipping TLS."
+    return
+  fi
+
+  # Run certbot
+  echo ""
+  echo "Requesting certificate for ${DOMAIN}..."
+  echo "Note: Port 80 must be accessible and not in use by another service."
+  echo ""
+
+  if sudo certbot certonly --standalone -d "${DOMAIN}" --email "${LE_EMAIL}" --agree-tos --non-interactive; then
+    TLS_CERT_PATH="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+    TLS_KEY_PATH="/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+
+    echo ""
+    echo -e "${GREEN}TLS certificate obtained successfully!${NC}"
+    echo "  Certificate: ${TLS_CERT_PATH}"
+    echo "  Private key: ${TLS_KEY_PATH}"
+
+    # Set up auto-renewal cron if not already present
+    if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
+      echo ""
+      read -p "Set up automatic certificate renewal (recommended)? (y/n): " auto_renew
+      if [[ "$auto_renew" =~ ^[Yy]$ ]]; then
+        (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook \"systemctl restart multiclaw-${role} 2>/dev/null || true\"") | crontab -
+        echo -e "${GREEN}Auto-renewal configured (daily at 3 AM).${NC}"
+      fi
+    else
+      echo "Auto-renewal cron already exists."
+    fi
+
+    # Grant read access to cert files for the service user
+    local CURRENT_USER=$(whoami)
+    if [[ "$CURRENT_USER" != "root" ]]; then
+      echo ""
+      echo -e "${YELLOW}Granting read access to certificate files for user ${CURRENT_USER}...${NC}"
+      sudo chmod 0755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/
+      sudo chmod 0644 "${TLS_CERT_PATH}"
+      sudo chmod 0640 "${TLS_KEY_PATH}"
+      sudo chgrp "$(id -gn ${CURRENT_USER})" "${TLS_KEY_PATH}"
+    fi
+  else
+    echo ""
+    echo -e "${YELLOW}Certbot failed. Common causes:${NC}"
+    echo "  - Port 80 is in use (stop nginx/apache first)"
+    echo "  - Domain doesn't point to this server's IP"
+    echo "  - Firewall blocking port 80"
+    echo ""
+    echo "You can retry later with:"
+    echo "  sudo certbot certonly --standalone -d ${DOMAIN}"
+    echo ""
+    echo "Continuing without TLS..."
+  fi
+}
+
+setup_tailscale() {
+  local role="${1}"
+
+  read -p "Enable Tailscale secure networking? (y/n): " ts_enable
+  if [[ ! "$ts_enable" =~ ^[Yy]$ ]]; then
+    TAILSCALE_ENABLED=false
+    TAILSCALE_MODE=""
+    TAILSCALE_TAG=""
+    return
+  fi
+
+  # Install Tailscale if not present
+  if ! command -v tailscale &> /dev/null; then
+    echo "Tailscale not found. Installing..."
+    curl -fsSL https://tailscale.com/install.sh | sh
+  else
+    echo "Tailscale already installed: $(tailscale version 2>/dev/null | head -1)"
+  fi
+
+  # ACL prerequisite instructions
+  echo ""
+  echo -e "${YELLOW}Before proceeding, ensure your Tailscale ACL policy includes:${NC}"
+  echo '  "tagOwners": {'
+  echo '    "tag:multiclaw-agent": ["autogroup:admin"],'
+  echo '    "tag:multiclaw-dashboard": ["autogroup:admin"]'
+  echo '  }'
+  echo "Configure at: https://login.tailscale.com/admin/acls"
+  echo ""
+  read -p "Have you configured the ACLs? (y/n): " acl_done
+  if [[ ! "$acl_done" =~ ^[Yy]$ ]]; then
+    echo "Please configure the ACLs and re-run the installer."
+    exit 1
+  fi
+
+  # Bring up Tailscale with the appropriate tag
+  if [[ "$role" == "dashboard" ]]; then
+    TAILSCALE_TAG="tag:multiclaw-dashboard"
+  else
+    TAILSCALE_TAG="tag:multiclaw-agent"
+  fi
+
+  echo "Bringing up Tailscale with tag ${TAILSCALE_TAG}..."
+  sudo tailscale up --advertise-tags="${TAILSCALE_TAG}"
+
+  # Wait for tailscale status to succeed
+  echo "Waiting for Tailscale to connect..."
+  local attempts=0
+  until tailscale status &> /dev/null; do
+    attempts=$((attempts + 1))
+    if [[ $attempts -ge 30 ]]; then
+      echo "Tailscale did not connect within expected time. Check 'tailscale status'."
+      exit 1
+    fi
+    sleep 2
+  done
+  echo -e "${GREEN}Tailscale connected.${NC}"
+
+  # Binding mode
+  read -p "Bind to Tailscale only? (no public access) (y/n): " ts_only
+  if [[ "$ts_only" =~ ^[Yy]$ ]]; then
+    TAILSCALE_MODE="tailscale-only"
+  else
+    TAILSCALE_MODE="dual-stack"
+  fi
+
+  TAILSCALE_ENABLED=true
+  echo -e "${GREEN}Tailscale setup complete. Mode: ${TAILSCALE_MODE}, Tag: ${TAILSCALE_TAG}${NC}"
+  echo ""
+}
+
+echo "What would you like to install?"
+echo "  1) Dashboard (control hub)"
+echo "  2) Agent (lightweight worker)"
+echo ""
+read -p "Enter choice [1/2]: " choice
+
+case $choice in
+  1)
+    echo -e "\n${GREEN}Installing MultiClaw Dashboard...${NC}\n"
+    if ! command -v node &> /dev/null; then
+      echo "Node.js is required. Install it from https://nodejs.org"
+      exit 1
+    fi
+    cd multi-claw-dashboard
+    echo "Installing dependencies..."
+    npm install
+    echo "Building client..."
+    cd client && npm install && npm run build && cd ..
+    echo "Setting up database..."
+    mkdir -p data
+    npx drizzle-kit generate 2>/dev/null || true
+    npx tsx server/db/migrate.ts
+
+    # -----------------------------------------------------------------------
+    # Dashboard configuration wizard
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━ Dashboard Configuration ━━━${NC}"
+    echo ""
+
+    # Port
+    read -p "Dashboard port [3000]: " DASH_PORT
+    DASH_PORT=${DASH_PORT:-3000}
+
+    # JWT Secret
+    echo ""
+    echo -e "${YELLOW}JWT Secret (used to sign auth tokens — must be 32+ characters)${NC}"
+    JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('base64'))")
+    echo "  Auto-generated: ${JWT_SECRET:0:20}..."
+    read -p "Use this secret? (Y to accept, or type your own): " jwt_input
+    if [[ -n "$jwt_input" && ! "$jwt_input" =~ ^[Yy]$ ]]; then
+      JWT_SECRET="$jwt_input"
+    fi
+
+    # Admin account
+    echo ""
+    echo -e "${YELLOW}Admin Account${NC}"
+    echo "  The first user will have full admin access."
+    read -p "Admin email [admin@multiclaw.dev]: " ADMIN_EMAIL
+    ADMIN_EMAIL=${ADMIN_EMAIL:-admin@multiclaw.dev}
+
+    read -s -p "Admin password (leave blank to auto-generate): " ADMIN_PASSWORD
+    echo ""
+    if [[ -z "$ADMIN_PASSWORD" ]]; then
+      ADMIN_PASSWORD=$(node -e "console.log(require('crypto').randomBytes(16).toString('base64url'))")
+      echo -e "  Auto-generated password: ${BOLD}${ADMIN_PASSWORD}${NC}"
+      echo -e "  ${YELLOW}Save this password — it will be stored in .env${NC}"
+    fi
+
+    # CORS origins
+    echo ""
+    DETECTED_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+    DEFAULT_CORS="http://localhost:${DASH_PORT},http://${DETECTED_IP}:${DASH_PORT}"
+    read -p "CORS allowed origins [${DEFAULT_CORS}]: " CORS_ORIGINS
+    CORS_ORIGINS=${CORS_ORIGINS:-$DEFAULT_CORS}
+
+    # AI Provider keys
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━ AI Provider Keys (optional — configure the ones you use) ━━━${NC}"
+    echo ""
+    echo "  These keys are pushed to all connected agents via config sync."
+    echo "  You can also configure them later in Dashboard → Settings."
+    echo ""
+
+    read -p "Anthropic API key (sk-ant-...): " ANTHROPIC_KEY
+    read -p "OpenAI API key (sk-...): " OPENAI_KEY
+    read -p "Google/Gemini API key: " GOOGLE_KEY
+    read -p "OpenRouter API key: " OPENROUTER_KEY
+    read -p "DeepSeek API key: " DEEPSEEK_KEY
+
+    # Tailscale setup
+    setup_tailscale "dashboard"
+
+    # TLS setup
+    setup_tls "dashboard"
+
+    # -----------------------------------------------------------------------
+    # Write .env
+    # -----------------------------------------------------------------------
+    cat > .env << ENVEOF
+# MultiClaw Dashboard Configuration
+PORT=${DASH_PORT}
+HOST=0.0.0.0
+JWT_SECRET=${JWT_SECRET}
+JWT_EXPIRES_IN=24h
+DB_PATH=./data/multiclaw.db
+CORS_ORIGINS=${CORS_ORIGINS}
+
+# Admin account (used to seed first user on startup)
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+ENVEOF
+
+    # Provider keys (only write non-empty ones)
+    echo "" >> .env
+    echo "# AI Provider Keys (synced to agents)" >> .env
+    [[ -n "$ANTHROPIC_KEY" ]] && echo "ANTHROPIC_API_KEY=${ANTHROPIC_KEY}" >> .env
+    [[ -n "$OPENAI_KEY" ]] && echo "OPENAI_API_KEY=${OPENAI_KEY}" >> .env
+    [[ -n "$GOOGLE_KEY" ]] && echo "GOOGLE_API_KEY=${GOOGLE_KEY}" >> .env
+    [[ -n "$OPENROUTER_KEY" ]] && echo "OPENROUTER_API_KEY=${OPENROUTER_KEY}" >> .env
+    [[ -n "$DEEPSEEK_KEY" ]] && echo "DEEPSEEK_API_KEY=${DEEPSEEK_KEY}" >> .env
+
+    # Tailscale
+    if [[ "${TAILSCALE_ENABLED}" == "true" ]]; then
+      cat >> .env << TSEOF
+
+# Tailscale
+MULTICLAW_TAILSCALE_ENABLED=true
+MULTICLAW_TAILSCALE_MODE=${TAILSCALE_MODE}
+MULTICLAW_TAILSCALE_TAG=${TAILSCALE_TAG}
+TSEOF
+    fi
+
+    # TLS
+    if [[ -n "${TLS_CERT_PATH}" && -n "${TLS_KEY_PATH}" ]]; then
+      cat >> .env << TLSEOF
+
+# TLS
+TLS_CERT=${TLS_CERT_PATH}
+TLS_KEY=${TLS_KEY_PATH}
+TLSEOF
+    fi
+
+    echo ""
+    echo -e "${GREEN}━━━ Dashboard installed! ━━━${NC}"
+    echo ""
+    echo -e "  Admin login:  ${BOLD}${ADMIN_EMAIL}${NC}"
+    echo -e "  Password:     ${BOLD}${ADMIN_PASSWORD}${NC}"
+    echo -e "  Port:         ${BOLD}${DASH_PORT}${NC}"
+    if [[ -n "${TLS_CERT_PATH}" ]]; then
+      echo -e "  HTTPS:        ${GREEN}enabled${NC}"
+    fi
+    echo ""
+    echo "  Start with:"
+    echo "    cd multi-claw-dashboard"
+    echo "    PORT=${DASH_PORT} npx tsx server/index.ts"
+    echo ""
+    echo "  Or install as systemd service:"
+    echo "    python manage.py install"
+    ;;
+  2)
+    echo -e "\n${GREEN}Installing MultiClaw Agent...${NC}\n"
+    if ! command -v python3 &> /dev/null; then
+      echo "Python 3.11+ is required."
+      exit 1
+    fi
+    cd multi-claw-agent
+
+    echo "Creating virtual environment..."
+    python3 -m venv .venv
+    source .venv/bin/activate
+    echo "Installing dependencies..."
+    pip install -e . -q
+
+    # -----------------------------------------------------------------------
+    # Agent configuration wizard
+    # -----------------------------------------------------------------------
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━ Agent Configuration ━━━${NC}"
+    echo ""
+
+    # Tailscale setup for agent (before URL prompts)
+    setup_tailscale "agent"
+
+    # Agent name
+    read -p "Agent name [Agent-001]: " AGENT_NAME
+    AGENT_NAME=${AGENT_NAME:-Agent-001}
+
+    # Dashboard connection
+    echo ""
+    echo -e "${YELLOW}Dashboard Connection${NC}"
+    echo "  You need an API key from your MultiClaw dashboard (Keys page)."
+    echo ""
+    read -p "API Key (mck_...): " AGENT_API_KEY
+
+    if [[ "${TAILSCALE_ENABLED}" == "true" ]]; then
+      echo "  Tailscale enabled — Dashboard URL will be discovered automatically."
+      DASHBOARD_URL=""
+    else
+      read -p "Dashboard URL (e.g. http://192.168.1.10:3100): " DASHBOARD_URL
+    fi
+
+    # Agent URL
+    DETECTED_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+    read -p "Agent port [8100]: " AGENT_PORT
+    AGENT_PORT=${AGENT_PORT:-8100}
+    read -p "Agent URL [http://${DETECTED_IP}:${AGENT_PORT}]: " AGENT_URL
+    AGENT_URL=${AGENT_URL:-http://${DETECTED_IP}:${AGENT_PORT}}
+
+    # AI Provider keys
+    echo ""
+    echo -e "${BOLD}${BLUE}━━━ AI Provider Keys (optional — or let dashboard push them) ━━━${NC}"
+    echo ""
+    echo "  If your dashboard has keys configured, they'll be synced automatically."
+    echo "  Set keys here only if this agent should use different keys."
+    echo ""
+
+    read -p "Anthropic API key (sk-ant-..., blank to skip): " AGENT_ANTHROPIC_KEY
+    read -p "OpenAI API key (sk-..., blank to skip): " AGENT_OPENAI_KEY
+    read -p "Google/Gemini API key (blank to skip): " AGENT_GOOGLE_KEY
+    read -p "OpenRouter API key (blank to skip): " AGENT_OPENROUTER_KEY
+    read -p "DeepSeek API key (blank to skip): " AGENT_DEEPSEEK_KEY
+
+    # Default provider
+    echo ""
+    echo "  Default AI provider:"
+    echo "    1) Anthropic (Claude)"
+    echo "    2) OpenAI (GPT)"
+    echo "    3) Google (Gemini)"
+    echo "    4) OpenRouter"
+    echo "    5) DeepSeek"
+    read -p "  Select [1]: " provider_choice
+    case ${provider_choice:-1} in
+      1) DEFAULT_PROVIDER="anthropic"; DEFAULT_MODEL="claude-sonnet-4-6" ;;
+      2) DEFAULT_PROVIDER="openai"; DEFAULT_MODEL="gpt-4o" ;;
+      3) DEFAULT_PROVIDER="gemini"; DEFAULT_MODEL="gemini-2.5-flash" ;;
+      4) DEFAULT_PROVIDER="openrouter"; DEFAULT_MODEL="anthropic/claude-sonnet-4" ;;
+      5) DEFAULT_PROVIDER="deepseek"; DEFAULT_MODEL="deepseek-chat" ;;
+      *) DEFAULT_PROVIDER="anthropic"; DEFAULT_MODEL="claude-sonnet-4-6" ;;
+    esac
+
+    # TLS setup
+    setup_tls "agent"
+
+    # -----------------------------------------------------------------------
+    # Write .env
+    # -----------------------------------------------------------------------
+    cat > .env << ENVEOF
+# MultiClaw Agent Configuration
+MULTICLAW_AGENT_NAME=${AGENT_NAME}
+MULTICLAW_PORT=${AGENT_PORT}
+MULTICLAW_HOST=0.0.0.0
+MULTICLAW_API_KEY=${AGENT_API_KEY}
+MULTICLAW_DASHBOARD_URL=${DASHBOARD_URL}
+MULTICLAW_AGENT_URL=${AGENT_URL}
+MULTICLAW_AUTO_REGISTER=true
+MULTICLAW_DEFAULT_PROVIDER=${DEFAULT_PROVIDER}
+MULTICLAW_DEFAULT_MODEL=${DEFAULT_MODEL}
+ENVEOF
+
+    # Provider keys (only write non-empty ones)
+    echo "" >> .env
+    echo "# AI Provider Keys" >> .env
+    [[ -n "$AGENT_ANTHROPIC_KEY" ]] && echo "MULTICLAW_ANTHROPIC_API_KEY=${AGENT_ANTHROPIC_KEY}" >> .env
+    [[ -n "$AGENT_OPENAI_KEY" ]] && echo "MULTICLAW_OPENAI_API_KEY=${AGENT_OPENAI_KEY}" >> .env
+    [[ -n "$AGENT_GOOGLE_KEY" ]] && echo "MULTICLAW_GOOGLE_API_KEY=${AGENT_GOOGLE_KEY}" >> .env
+    [[ -n "$AGENT_OPENROUTER_KEY" ]] && echo "MULTICLAW_OPENROUTER_API_KEY=${AGENT_OPENROUTER_KEY}" >> .env
+    [[ -n "$AGENT_DEEPSEEK_KEY" ]] && echo "MULTICLAW_DEEPSEEK_API_KEY=${AGENT_DEEPSEEK_KEY}" >> .env
+
+    # Tailscale
+    if [[ "${TAILSCALE_ENABLED}" == "true" ]]; then
+      cat >> .env << TSEOF
+
+# Tailscale
+MULTICLAW_TAILSCALE_ENABLED=true
+MULTICLAW_TAILSCALE_MODE=${TAILSCALE_MODE}
+MULTICLAW_TAILSCALE_TAG=${TAILSCALE_TAG}
+TSEOF
+    fi
+
+    # TLS
+    if [[ -n "${TLS_CERT_PATH}" && -n "${TLS_KEY_PATH}" ]]; then
+      cat >> .env << TLSEOF
+
+# TLS
+MULTICLAW_TLS_CERT=${TLS_CERT_PATH}
+MULTICLAW_TLS_KEY=${TLS_KEY_PATH}
+TLSEOF
+    fi
+
+    echo ""
+    echo -e "${GREEN}━━━ Agent installed! ━━━${NC}"
+    echo ""
+    echo -e "  Name:     ${BOLD}${AGENT_NAME}${NC}"
+    echo -e "  Port:     ${BOLD}${AGENT_PORT}${NC}"
+    echo -e "  Provider: ${BOLD}${DEFAULT_PROVIDER} / ${DEFAULT_MODEL}${NC}"
+    if [[ -n "${TLS_CERT_PATH}" ]]; then
+      echo -e "  HTTPS:    ${GREEN}enabled${NC}"
+    fi
+    echo ""
+    echo "  Start the agent:"
+    echo "    source .venv/bin/activate"
+    if [[ -n "${TLS_CERT_PATH}" ]]; then
+      echo "    uvicorn src.main:app --host 0.0.0.0 --port ${AGENT_PORT} --ssl-certfile ${TLS_CERT_PATH} --ssl-keyfile ${TLS_KEY_PATH}"
+    else
+      echo "    uvicorn src.main:app --host 0.0.0.0 --port ${AGENT_PORT}"
+    fi
+    echo ""
+    echo "  The agent will automatically connect to the dashboard on startup."
+    ;;
+  *)
+    echo "Invalid choice. Please enter 1 or 2."
+    exit 1
+    ;;
+esac

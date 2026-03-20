@@ -1,0 +1,13 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+node_modules/
+dist/
+data/
+.DS_Store
+/docs
+docs/*
+.superpowers/
+multi-claw-agent/cron_runs/
+multi-claw-dashboard/uploads/

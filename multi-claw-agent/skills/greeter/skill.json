@@ -1,0 +1,7 @@
+{
+  "name": "greeter",
+  "description": "A greeting skill",
+  "version": "1.0.0",
+  "entry_point": "main.py",
+  "installed_at": "2026-03-19T13:37:36.136929+00:00"
+}

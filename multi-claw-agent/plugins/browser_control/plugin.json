@@ -1,0 +1,24 @@
+{
+  "name": "browser-control",
+  "version": "1.0.0",
+  "description": "Browser automation via Playwright",
+  "entry_point": "main.py",
+  "enabled": true,
+  "config": {
+    "browser": "chromium",
+    "headless": true,
+    "viewport": {"width": 1280, "height": 720},
+    "default_timeout": 30000,
+    "user_agent": null,
+    "allow_js_execution": false,
+    "blocked_url_patterns": [
+      "169.254.169.254",
+      "metadata.google.internal",
+      "localhost",
+      "127.0.0.1",
+      "0.0.0.0",
+      "[::1]"
+    ],
+    "allowed_url_patterns": []
+  }
+}

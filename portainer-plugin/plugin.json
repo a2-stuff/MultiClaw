@@ -1,0 +1,7 @@
+{
+  "name": "portainer",
+  "description": "Install Portainer CE Docker management UI",
+  "version": "1.0.0",
+  "entry_point": "main.py",
+  "enabled": true
+}

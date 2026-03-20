@@ -1,0 +1,8 @@
+{
+  "name": "tailscale",
+  "description": "Tailscale VPN mesh networking for secure agent-dashboard communication",
+  "version": "1.0.0",
+  "entry_point": "main.py",
+  "enabled": true,
+  "built_in": true
+}
