@@ -493,6 +493,16 @@ Plugins extend an agent's core functionality with integrations such as Docker ma
 - The dashboard maintains a central **plugin registry** seeded with default plugins at startup
 - Admins can add new plugins to the registry by providing a GitHub repository URL
 
+**Available plugins:**
+
+| Plugin | Description | Key Features |
+|--------|-------------|--------------|
+| **Browser Control** | Browser automation via Playwright | Navigate pages, fill forms, click elements, take screenshots, extract text/HTML, manage tabs, handle cookies, emulate devices. 19 agent-facing tools. Supports Chromium, Firefox, and WebKit. Configurable viewport, user agent, URL allowlists/blocklists, and JavaScript execution policy. |
+| **Docker** | Install and manage Docker containers on the agent host | Pull images, create/start/stop/remove containers, inspect container state, list containers and images, manage volumes and networks. |
+| **Portainer** | Install Portainer CE Docker management UI | Automated Portainer CE installation and setup, providing a web-based GUI for Docker container management on the agent host. |
+| **Tailscale** | Tailscale VPN mesh networking | Secure zero-config networking between agents and dashboard. Automatic peer discovery, ACL tag management, and support for dual-stack or Tailscale-only networking modes. |
+| **Hello Plugin** | Minimal example / template plugin | Demonstrates the plugin interface (entry point, plugin.json structure, tool registration). Use as a starting point for building custom plugins. |
+
 **Installing a plugin on an agent:**
 
 1. Open the agent's **Plugins** tab.

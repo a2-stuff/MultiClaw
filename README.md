@@ -236,6 +236,16 @@ Skills are deployed per agent from the marketplace UI.
 
 Plugins extend the agent runtime itself — adding new endpoints, integrations, or background services. The git-based plugin registry lets you browse, clone, and install plugins on any connected agent. Post-install scripts run automatically after installation. Plugins can be individually enabled or disabled per agent.
 
+**Available plugins:**
+
+| Plugin | Description |
+|--------|-------------|
+| **Browser Control** | Browser automation via Playwright — navigate, fill forms, take screenshots, extract content, and more with 19 agent-facing tools. Supports Chromium, Firefox, and WebKit in headless or headed mode. |
+| **Docker** | Install and manage Docker containers on the agent host — pull images, run containers, inspect state, and control lifecycle. |
+| **Portainer** | Install Portainer CE, the Docker management web UI, on the agent host for visual container management. |
+| **Tailscale** | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery. |
+| **Hello Plugin** | Minimal example plugin demonstrating the plugin interface — useful as a template for building custom plugins. |
+
 ### Crons
 
 Schedule recurring commands on any agent using standard cron expressions. Execution history is stored and viewable per agent. Results and any output are logged in `cron_runs/`.
