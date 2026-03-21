@@ -107,6 +107,7 @@ async def plugin_health_check(slug: str):
         from src.plugins.builtin_manifests import get_builtin_manifest
         manifest_data = get_builtin_manifest(slug)
     if not manifest_data:
+        return {"healthy": True, "checks": [], "note": "No health checks defined"}
 
     manifest = parse_manifest(manifest_data)
     results = manifest_runner.run_health_checks(slug, manifest)
