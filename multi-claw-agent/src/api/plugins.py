@@ -91,15 +91,24 @@ async def uninstall_plugin(name: str):
                 return {"uninstalled": True}
 
     # Try built-in plugin uninstall
+    # Determine if this is the main agent source tree (don't delete source files)
+    source_plugins = Path(__file__).resolve().parent.parent.parent / "plugins"
+    is_source_dir = Path(settings.plugins_dir).resolve() == source_plugins.resolve()
+
     for slug in candidates:
         # Unload from memory
         if slug in plugin_loader.active_plugins:
             plugin_loader.unload_plugin(slug)
-        # Remove from disk
+
         plugin_dir = Path(settings.plugins_dir) / slug
         if plugin_dir.exists():
-            shutil.rmtree(plugin_dir)
-            return {"uninstalled": True}
+            if is_source_dir:
+                # Main agent: just deactivate, don't delete source files
+                return {"uninstalled": True, "note": "Plugin deactivated (source files preserved)"}
+            else:
+                # Spawned agent: delete the copied plugin files
+                shutil.rmtree(plugin_dir)
+                return {"uninstalled": True}
 
     raise HTTPException(status_code=404, detail="Plugin not found")
 
