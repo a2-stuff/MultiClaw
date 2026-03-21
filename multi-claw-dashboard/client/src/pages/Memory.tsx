@@ -179,11 +179,122 @@ function StateTab() {
 
 // ─── Knowledge Tab ───────────────────────────────────────────────────────────
 
+// ─── Knowledge Detail Modal ──────────────────────────────────────────────────
+
+function KnowledgeDetailModal({ entry, onClose, onSaved, onDeleted }: {
+  entry: KnowledgeEntry;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [content, setContent] = useState(entry.content);
+  const [metadata, setMetadata] = useState(entry.metadata || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSave() {
+    if (!content.trim()) { setError("Content cannot be empty"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      let parsedMeta: any = undefined;
+      if (metadata.trim()) {
+        try { parsedMeta = JSON.parse(metadata); } catch { setError("Invalid metadata JSON"); setSaving(false); return; }
+      }
+      await api.put(`/memory/entries/${entry.id}`, { content, metadata: parsedMeta || null });
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete this knowledge entry?")) return;
+    try {
+      await api.delete(`/memory/entries/${entry.id}`);
+      onDeleted(entry.id);
+      onClose();
+    } catch {
+      setError("Failed to delete");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white text-lg font-bold">Knowledge Entry</h3>
+          <div className="flex items-center gap-2">
+            {entry.hasEmbedding ? (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-green-900 text-green-300">embedding</span>
+            ) : (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">no embedding</span>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+          </div>
+        </div>
+
+        <div className="space-y-4 flex-1 overflow-y-auto">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Content</label>
+            <textarea value={content} onChange={e => setContent(e.target.value)} rows={10}
+              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white resize-y" />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Metadata (JSON)</label>
+            <textarea value={metadata} onChange={e => setMetadata(e.target.value)} rows={3}
+              className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono resize-y"
+              placeholder='e.g. {"source": "docs", "topic": "api"}' />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div>
+              <span className="text-gray-600">ID:</span> <span className="font-mono">{entry.id}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Created by:</span> {entry.createdBy || "unknown"}
+            </div>
+            <div>
+              <span className="text-gray-600">Created:</span> {new Date(entry.createdAt).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-800">
+          <button onClick={handleDelete} className="px-3 py-1.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg">
+            Delete
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50">
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Knowledge Tab ───────────────────────────────────────────────────────────
+
 function KnowledgeTab() {
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+
+  // Detail modal
+  const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntry | null>(null);
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -286,7 +397,7 @@ function KnowledgeTab() {
           ) : (
             <div className="divide-y divide-gray-800/50">
               {searchResults.map(r => (
-                <div key={r.id} className="px-4 py-3">
+                <div key={r.id} className="px-4 py-3 cursor-pointer hover:bg-gray-800/40" onClick={() => setSelectedEntry(r)}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white whitespace-pre-wrap break-words">{r.content.slice(0, 300)}{r.content.length > 300 ? "..." : ""}</p>
@@ -298,7 +409,7 @@ function KnowledgeTab() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs font-mono text-blue-400">{(r.similarity * 100).toFixed(1)}%</span>
-                      <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
                     </div>
                   </div>
                 </div>
@@ -356,7 +467,7 @@ function KnowledgeTab() {
                 </thead>
                 <tbody>
                   {entries.map(e => (
-                    <tr key={e.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <tr key={e.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer" onClick={() => setSelectedEntry(e)}>
                       <td className="px-4 py-2 max-w-md">
                         <p className="text-white truncate">{e.content.slice(0, 120)}{e.content.length > 120 ? "..." : ""}</p>
                       </td>
@@ -374,7 +485,7 @@ function KnowledgeTab() {
                         {new Date(e.createdAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-2">
-                        <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
+                        <button onClick={(ev) => { ev.stopPropagation(); handleDelete(e.id); }} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -393,6 +504,19 @@ function KnowledgeTab() {
             </div>
           )}
         </>
+      )}
+
+      {/* Detail/Edit Modal */}
+      {selectedEntry && (
+        <KnowledgeDetailModal
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onSaved={() => { loadEntries(); }}
+          onDeleted={(id) => {
+            loadEntries();
+            if (searchResults) setSearchResults(searchResults.filter(r => r.id !== id));
+          }}
+        />
       )}
     </div>
   );

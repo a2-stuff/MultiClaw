@@ -82,6 +82,50 @@ router.get("/entries", async (req, res) => {
   }
 });
 
+// Get single entry
+router.get("/entries/:id", async (req, res) => {
+  try {
+    const entry = db.select({
+      id: knowledgeEntries.id, content: knowledgeEntries.content,
+      metadata: knowledgeEntries.metadata, createdBy: knowledgeEntries.createdBy,
+      createdAt: knowledgeEntries.createdAt, updatedAt: knowledgeEntries.updatedAt,
+      hasEmbedding: sql<boolean>`${knowledgeEntries.embedding} IS NOT NULL`,
+    }).from(knowledgeEntries).where(eq(knowledgeEntries.id, req.params.id)).get();
+    if (!entry) return res.status(404).json({ error: "Entry not found" });
+    res.json(entry);
+  } catch (err) {
+    console.error("Failed to get entry:", err);
+    res.status(500).json({ error: "Failed to get entry" });
+  }
+});
+
+// Update entry
+router.put("/entries/:id", async (req, res) => {
+  try {
+    const entry = db.select().from(knowledgeEntries).where(eq(knowledgeEntries.id, req.params.id)).get();
+    if (!entry) return res.status(404).json({ error: "Entry not found" });
+
+    const { content, metadata } = req.body;
+    if (!content) return res.status(400).json({ error: "content required" });
+
+    const updates: any = { content, updatedAt: new Date().toISOString() };
+    updates.metadata = metadata !== undefined ? (metadata ? JSON.stringify(metadata) : null) : entry.metadata;
+
+    // Re-generate embedding if content changed
+    if (content !== entry.content) {
+      const embedding = await generateEmbedding(content);
+      updates.embedding = embedding ? JSON.stringify(embedding) : null;
+    }
+
+    db.update(knowledgeEntries).set(updates).where(eq(knowledgeEntries.id, req.params.id)).run();
+    auditFromReq(req, "memory.update", { type: "knowledge", id: req.params.id });
+    res.json({ success: true, hasEmbedding: updates.embedding !== undefined ? !!updates.embedding : !!entry.embedding });
+  } catch (err) {
+    console.error("Failed to update entry:", err);
+    res.status(500).json({ error: "Failed to update entry" });
+  }
+});
+
 // Delete entry
 router.delete("/entries/:id", async (req, res) => {
   try {
