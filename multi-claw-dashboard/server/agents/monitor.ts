@@ -23,20 +23,34 @@ export class AgentMonitor {
   }
 
   private autoStartSpawnedAgents() {
+    const { execSync } = require("child_process");
     const allAgents = db.select().from(agents).all();
     for (const agent of allAgents) {
       if (!agent.spawnedLocally || !agent.spawnDir || agent.containerId) continue;
-      // Check if process is actually running
-      const isRunning = agent.spawnPid ? (() => {
+
+      // Check if process is actually running (by PID)
+      const pidAlive = agent.spawnPid ? (() => {
         try { process.kill(agent.spawnPid, 0); return true; } catch { return false; }
       })() : false;
-      if (!isRunning) {
+      if (pidAlive) continue;
+
+      // Check if port is already in use (agent may be managed externally, e.g. systemd)
+      if (agent.spawnPort) {
         try {
-          const pid = startSpawnedAgent(agent.id);
-          console.log(`Auto-started spawned agent '${agent.name}' (PID ${pid}, port ${agent.spawnPort})`);
-        } catch (err: any) {
-          console.warn(`Failed to auto-start agent '${agent.name}': ${err.message}`);
-        }
+          const out = execSync(`lsof -ti tcp:${agent.spawnPort} 2>/dev/null || true`, { encoding: "utf-8" }).trim();
+          if (out) {
+            // Port occupied — agent is running externally, just clear stale PID
+            db.update(agents).set({ spawnPid: null }).where(eq(agents.id, agent.id)).run();
+            continue;
+          }
+        } catch {}
+      }
+
+      try {
+        const pid = startSpawnedAgent(agent.id);
+        console.log(`Auto-started spawned agent '${agent.name}' (PID ${pid}, port ${agent.spawnPort})`);
+      } catch (err: any) {
+        console.warn(`Failed to auto-start agent '${agent.name}': ${err.message}`);
       }
     }
   }
