@@ -86,13 +86,22 @@ export class AgentMonitor {
     sseManager.broadcast("agents_update", updated);
     wsManager.broadcast("agents_update", updated);
 
-    // Check for dead spawned processes
+    // Check for dead spawned processes and auto-restart them
     for (const agent of allAgents) {
-      if (agent.spawnPid && agent.spawnedLocally && !agent.spawnHost) {
+      if (agent.spawnPid && agent.spawnedLocally && !agent.spawnHost && !agent.containerId) {
         try {
           process.kill(agent.spawnPid, 0);
         } catch {
+          // Process is dead — attempt auto-restart
           db.update(agents).set({ spawnPid: null, status: "offline" }).where(eq(agents.id, agent.id)).run();
+          if (agent.spawnDir) {
+            try {
+              const pid = startSpawnedAgent(agent.id);
+              console.log(`Auto-restarted dead agent '${agent.name}' (PID ${pid}, port ${agent.spawnPort})`);
+            } catch (err: any) {
+              console.warn(`Failed to auto-restart agent '${agent.name}': ${err.message}`);
+            }
+          }
         }
       }
     }
