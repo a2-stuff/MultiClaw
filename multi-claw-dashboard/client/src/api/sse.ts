@@ -31,6 +31,11 @@ export function useSSE(url: string, onEvent: (event: string, data: any) => void)
         "orchestration_progress",
         "orchestration_complete",
         "orchestration_error",
+        "dashboard_answer_start",
+        "dashboard_answer",
+        "synthesis_start",
+        "synthesis_complete",
+        "synthesis_error",
       ];
       for (const evt of orchEvents) {
         es.addEventListener(evt, handleEvent(evt));

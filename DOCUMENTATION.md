@@ -1,6 +1,6 @@
 # MultiClaw Documentation
 
-**Version:** 1.0 | **Updated:** March 2026
+**Version:** 1.1 | **Updated:** March 2026
 
 ---
 
@@ -437,14 +437,25 @@ Each log line shows: **time** (HH:MM:SS), **level**, and **message**. Up to 500 
 
 ## Tasks
 
-Tasks are prompts dispatched to an agent for execution. The agent processes them using its configured AI provider and model, optionally using its installed skills and plugins.
+Tasks are prompts dispatched to agents for execution. The agent processes them using its configured AI provider and model, optionally using its installed skills and plugins.
 
-**Sending tasks:**
+**@Mention Dispatch:**
 
-Tasks can be sent from several places:
-- The **Dashboard** home page — dispatch to any online agent
+The dashboard home page uses an @mention editor for task dispatch. Type `@` in the prompt textarea to open an autocomplete dropdown showing all registered agents with live status indicators (online, busy, offline, error). Select an agent to insert it as an inline blue pill. The routing is automatic:
+
+- **No agents tagged** → The dashboard answers directly using its built-in administrator profile, database access, and relevant knowledge base entries
+- **1 agent tagged** → Direct dispatch to that agent with memory context injection
+- **2+ agents tagged** → Parallel dispatch to all tagged agents simultaneously — each agent works independently and results stream in real-time. Once all complete, the dashboard synthesizes a unified summary.
+
+The @mention dropdown supports arrow key navigation and Escape to dismiss. Cmd+Enter submits the prompt.
+
+**Centralized Memory Integration:**
+
+Before dispatching, the dashboard searches the knowledge base for relevant entries and injects them into each agent's prompt as shared context. After execution, results and synthesis are written back to the knowledge base for future reference.
+
+**Other dispatch methods:**
 - The **Tasks** tab of a specific agent — dispatches only to that agent
-- Via the **API** — `POST /api/agents/:id/tasks` with `{ "prompt": "..." }`
+- Via the **API** — `POST /api/tasks/dispatch` with `{ "prompt": "...", "agentIds": ["..."] }` for agent dispatch, or `POST /api/tasks/ask` with `{ "prompt": "..." }` for dashboard-direct queries
 
 **Task history:**
 

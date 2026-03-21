@@ -27,6 +27,7 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   "deepseek_api_key",
   "default_provider",
   "default_model",
+  "dashboard_profile",
 ]);
 
 router.put("/:key", requireRole("canManageUsers"), async (req, res) => {
@@ -68,6 +69,16 @@ router.delete("/:key", requireRole("canManageUsers"), async (req, res) => {
   db.delete(settings).where(eq(settings.key, key)).run();
   auditFromReq(req, "settings.delete", { type: "setting", id: req.params.key });
   res.json({ success: true });
+});
+
+router.get("/dashboard-preview", requireRole("canManageUsers"), async (_req, res) => {
+  try {
+    const { getLiveContextPreview } = await import("../dashboard/profile.js");
+    const preview = await getLiveContextPreview();
+    res.json({ preview });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to generate preview" });
+  }
 });
 
 export { router as settingsRouter };

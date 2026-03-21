@@ -165,6 +165,15 @@ Every agent has a unique `mca_`-prefixed API key (64 hex characters) used for al
 
 Agent identity and system prompt are managed centrally from the dashboard. Agents do not self-configure their identity.
 
+### Dashboard Brain
+
+The dashboard has its own LLM-powered administrator profile for answering direct queries and synthesizing parallel agent results. The dashboard brain:
+
+- Uses the Anthropic API key stored in the settings table (same key pushed to agents).
+- Reads the `default_model` setting or falls back to `claude-sonnet-4-6`.
+- Writes answers and synthesis results to the knowledge base with `type: "dashboard_answer"` or `type: "synthesis"` metadata for traceability.
+- Memory context injection is non-blocking — if embeddings or search fail, dispatch proceeds without shared knowledge rather than blocking the request.
+
 ### Skill & Plugin Execution
 
 - Skills are loaded via `importlib` exclusively from validated, allowlisted paths.

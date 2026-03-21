@@ -2,6 +2,31 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.1.0] - 2026-03-21
+
+### Added
+- **Dashboard Brain** — The dashboard now has its own LLM-powered administrator profile that answers queries directly when no agents are @mentioned. Customizable personality in Settings with auto-injected live system state (agent list, statuses, task counts).
+- **@Mention Agent Tagging** — Replaced agent selection buttons with Slack-style @mention autocomplete in the task prompt. Type `@` to see a dropdown of agents with status indicators. Agents appear as inline blue pills and in a tag bar above the editor.
+- **Parallel Task Execution** — When multiple agents are @mentioned, tasks dispatch to all agents simultaneously (not sequentially). Each agent works independently and results stream in real-time as they complete.
+- **Dashboard Synthesis** — After all parallel agents complete, the dashboard automatically synthesizes a unified summary of all results, noting agreements, contradictions, and gaps.
+- **Centralized Memory Integration** — Relevant knowledge base entries are injected into agent prompts before dispatch. Agent results and dashboard syntheses are written back to the knowledge base for future reference.
+- **Orchestrations Database Table** — Task orchestrations are now persisted to SQLite (previously in-memory only), enabling task history queries and surviving server restarts.
+- **Dashboard Profile Settings** — New "Dashboard Profile" section in Settings page with custom instructions textarea and live context preview showing auto-injected system state.
+- **Keyword Fallback Search** — Memory context search falls back to keyword matching when OpenAI embeddings are unavailable, ensuring memory injection works with only an Anthropic API key.
+- New SSE/WebSocket events: `dashboard_answer_start`, `dashboard_answer`, `synthesis_start`, `synthesis_complete`, `synthesis_error`
+
+### Changed
+- Task dispatch UI completely redesigned — `contenteditable` Lexical editor replaces plain textarea
+- Send button dynamically shows "Ask Dashboard" (no tags) or "Dispatch to N agents" (with tags)
+- Sequential chain execution replaced by parallel dispatch as default mode
+- `executeChain()` preserved as deprecated for programmatic API use
+
+### Dependencies
+- Added `@anthropic-ai/sdk` (server — dashboard LLM calls)
+- Added `lexical`, `@lexical/react`, `@lexical/plain-text` (client — @mention editor)
+
+---
+
 ## [1.0.1] - 2026-03-21
 
 ### Added
@@ -92,5 +117,6 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.1.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.1.0
 [1.0.1]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.1
 [1.0.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.0
