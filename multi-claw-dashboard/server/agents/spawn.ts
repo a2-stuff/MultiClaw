@@ -116,12 +116,39 @@ export async function spawnLocalAgent(opts: SpawnOptions, userId: string): Promi
 
 export function stopSpawnedAgent(agentId: string): void {
   const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
-  if (!agent || !agent.spawnPid) throw new Error("Agent not found or not spawned");
+  if (!agent) throw new Error("Agent not found");
 
-  try {
-    process.kill(agent.spawnPid, "SIGTERM");
-  } catch {
-    // Process may already be dead
+  let killed = false;
+
+  // Try stored PID first
+  if (agent.spawnPid) {
+    try {
+      process.kill(agent.spawnPid, "SIGTERM");
+      killed = true;
+    } catch {
+      // Process may already be dead
+    }
+  }
+
+  // If no PID or stored PID was stale, find process by port
+  if (!killed && agent.spawnPort) {
+    try {
+      const out = execSync(`lsof -ti tcp:${agent.spawnPort} 2>/dev/null || true`, { encoding: "utf-8" }).trim();
+      if (out) {
+        for (const pidStr of out.split("\n")) {
+          const pid = parseInt(pidStr, 10);
+          if (pid > 0) {
+            try { process.kill(pid, "SIGTERM"); killed = true; } catch {}
+          }
+        }
+      }
+    } catch {
+      // lsof may not be available
+    }
+  }
+
+  if (!killed && !agent.spawnPid && !agent.spawnPort) {
+    throw new Error("Agent has no PID or port to stop");
   }
 
   db.update(agents).set({ status: "offline", spawnPid: null }).where(eq(agents.id, agentId)).run();
@@ -131,9 +158,17 @@ export function startSpawnedAgent(agentId: string): number {
   const agent = db.select().from(agents).where(eq(agents.id, agentId)).get();
   if (!agent || !agent.spawnDir) throw new Error("Agent not found or not spawned");
 
+  // Check if port is already in use (agent may already be running externally)
+  const port = agent.spawnPort || findAvailablePort();
+  try {
+    const out = execSync(`lsof -ti tcp:${port} 2>/dev/null || true`, { encoding: "utf-8" }).trim();
+    if (out) throw new Error(`Port ${port} is already in use — agent may already be running`);
+  } catch (e: any) {
+    if (e.message?.includes("already in use")) throw e;
+  }
+
   const venvDir = path.join(agent.spawnDir, ".venv");
   const pythonBin = path.join(venvDir, "bin", "python");
-  const port = agent.spawnPort || findAvailablePort();
 
   const proc = cpSpawn(pythonBin, ["-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", String(port)], {
     cwd: agent.spawnDir,

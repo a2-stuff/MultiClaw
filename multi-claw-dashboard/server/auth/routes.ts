@@ -22,8 +22,7 @@ router.post("/register", async (req, res) => {
     if (existing) return res.status(409).json({ error: "Email already registered" });
     const id = uuid();
     const passwordHash = await bcrypt.hash(password, 12);
-    const allUsers = db.select().from(users).all();
-    const role = allUsers.length === 0 ? "admin" : "viewer";
+    const role = "viewer";
     db.insert(users).values({ id, email, passwordHash, name, role }).run();
     const token = jwt.sign({ id, email, role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
     res.status(201).json({ user: { id, email, name, role }, token });

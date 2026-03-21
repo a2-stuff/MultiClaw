@@ -12,7 +12,6 @@ const nav = [
   { path: "/crons", label: "Crons" },
   { path: "/keys", label: "Keys" },
   { path: "/users", label: "Users" },
-  { path: "/settings", label: "Settings" },
   { path: "/delegations", label: "Delegations" },
   { path: "/memory", label: "Memory" },
   { path: "/audit", label: "Audit Log" },
@@ -41,6 +40,7 @@ export function Layout({ children, onLogout }: { children: ReactNode; onLogout: 
         <div className="flex items-center gap-4">
           <TailscaleStatus />
           <Link to="/help" className={`text-sm transition ${location.pathname === "/help" ? "text-white font-medium" : "text-gray-400 hover:text-white"}`}>Help</Link>
+          <Link to="/settings" className={`text-sm transition ${location.pathname === "/settings" ? "text-white font-medium" : "text-gray-400 hover:text-white"}`}>Settings</Link>
           <button onClick={onLogout} className="text-sm text-gray-400 hover:text-white transition">Logout</button>
         </div>
       </nav>

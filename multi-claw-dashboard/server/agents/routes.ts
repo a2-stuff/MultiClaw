@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import crypto from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { agents, agentSkills, agentPlugins, agentTasks, skills, plugins } from "../db/schema.js";
+import { agents, agentSkills, agentPlugins, agentTasks, skills, plugins, apiKeys } from "../db/schema.js";
 import { requireAuth, requireRole } from "../auth/middleware.js";
 import { resolveAgentUrl } from "../tailscale/helpers.js";
 import { validateAgentUrl } from "./url-validation.js";
@@ -14,6 +14,22 @@ import { auditFromReq } from "../audit/logger.js";
 const router = Router();
 router.use(requireAuth);
 
+/** Create a management API key (mck_) for an agent so it shows on the Keys page. */
+function ensureManagementKey(agentId: string, agentName: string, createdBy: string): void {
+  const existing = db.select({ id: apiKeys.id }).from(apiKeys).where(eq(apiKeys.agentId, agentId)).get();
+  if (existing) return;
+  const rawKey = `mck_${crypto.randomBytes(32).toString("hex")}`;
+  const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+  db.insert(apiKeys).values({
+    id: uuid(),
+    name: `${agentName}-key`,
+    keyHash,
+    keyPrefix: rawKey.slice(0, 12),
+    agentId,
+    createdBy,
+  }).run();
+}
+
 router.post("/", requireRole("canManageAgents"), async (req, res) => {
   try {
     const { name, url } = req.body;
@@ -22,6 +38,7 @@ router.post("/", requireRole("canManageAgents"), async (req, res) => {
     const id = uuid();
     const apiKey = `mca_${crypto.randomBytes(32).toString("hex")}`;
     db.insert(agents).values({ id, name, url, apiKey, registeredBy: req.user!.id }).run();
+    ensureManagementKey(id, name, req.user!.id);
     auditFromReq(req, "agent.create", { type: "agent", id }, { name, url });
     res.status(201).json({ agent: { id, name, url, status: "offline" }, apiKey });
   } catch (err: any) {
@@ -66,6 +83,7 @@ router.post("/spawn", requireRole("canManageAgents"), async (req, res) => {
       }).where(eq(agents.id, result.agentId)).run();
     }
 
+    ensureManagementKey(result.agentId, name.trim(), req.user!.id);
     auditFromReq(req, "agent.spawn", { type: "agent", id: result.agentId }, { name: req.body.name, port: result.port });
     res.status(201).json(result);
   } catch (err: any) {
@@ -103,6 +121,7 @@ router.post("/spawn-docker", requireRole("canManageAgents"), async (req, res) =>
       { name: name.trim(), memoryLimit, cpuLimit, dashboardUrl },
       req.user!.id
     );
+    ensureManagementKey(result.agentId, name.trim(), req.user!.id);
     auditFromReq(req, "agent.docker_spawn", { type: "agent", id: result.agentId }, { containerId: result.containerId });
     res.status(201).json(result);
   } catch (err: any) {

@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || "3000"),
+  port: parseInt(process.env.PORT || "3100"),
   host: process.env.HOST || "0.0.0.0",
   jwtSecret: process.env.JWT_SECRET || "",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "24h",
@@ -13,6 +13,6 @@ export const config = {
   tailscaleEnabled: process.env.MULTICLAW_TAILSCALE_ENABLED === "true",
   tailscaleMode: process.env.MULTICLAW_TAILSCALE_MODE || "dual-stack",
   tailscaleTag: process.env.MULTICLAW_TAILSCALE_TAG || "tag:multiclaw-dashboard",
-  adminEmail: process.env.ADMIN_EMAIL || "",
+  adminEmail: process.env.ADMIN_EMAIL || "admin@multiclaw.dev",
   adminPassword: process.env.ADMIN_PASSWORD || "",
 };

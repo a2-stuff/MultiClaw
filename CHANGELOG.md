@@ -2,6 +2,32 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.0.1] - 2026-03-21
+
+### Added
+- Agent authentication for memory API endpoints (X-API-Key alongside JWT)
+- `requireAuthOrAgent` middleware for dual auth support
+- `agent` role in RBAC with task execution permissions
+- Python memory client (`multi-claw-agent/src/memory.py`) for shared state and knowledge
+- Auto-creation of management API keys when agents are registered, spawned, or docker-spawned
+- Auto-generated admin password on first startup when `ADMIN_PASSWORD` is not set
+- Improved agent stop/start with port-based process detection fallback
+
+### Fixed
+- Memory API endpoints blocked by delegation router middleware ordering
+- `hasPermission` return type coerced to boolean
+- Dashboard default port changed from 3000 to 3100 to avoid conflicts
+- Registration no longer grants first user admin role (admin seeded via `seed-admin`)
+- Agent stop button visibility for externally-started agents
+- Settings link moved to top-right nav for consistency
+
+### Changed
+- Default admin email set to `admin@multiclaw.dev` when not configured
+- Documentation updated for admin account seeding and CORS defaults
+- Tests directory excluded from git tracking
+
+---
+
 ## [1.0.0] - 2026-03-20
 
 ### Added
@@ -66,4 +92,5 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.0.1]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.1
 [1.0.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.0

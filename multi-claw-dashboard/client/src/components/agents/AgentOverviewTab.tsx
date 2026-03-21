@@ -211,7 +211,7 @@ export function AgentOverviewTab({ agent }: { agent: Agent }) {
         </button>
         {agent.spawnedLocally && !agent.containerId && (
           <>
-            {agent.spawnPid ? (
+            {agent.status === "online" || agent.status === "busy" || agent.spawnPid ? (
               <button onClick={stopAgent} disabled={stopping}
                 className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 disabled:bg-gray-800 rounded-lg text-red-400 text-xs font-medium transition">
                 {stopping ? "Stopping..." : "Stop Agent"}
