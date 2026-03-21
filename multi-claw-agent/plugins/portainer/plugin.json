@@ -1,0 +1,8 @@
+{
+  "name": "portainer",
+  "version": "1.0.0",
+  "description": "Portainer CE container management UI",
+  "entry_point": "main.py",
+  "enabled": true,
+  "built_in": true
+}

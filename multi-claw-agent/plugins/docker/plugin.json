@@ -1,0 +1,8 @@
+{
+  "name": "docker",
+  "version": "1.0.0",
+  "description": "Docker CE installation and management",
+  "entry_point": "main.py",
+  "enabled": true,
+  "built_in": true
+}
