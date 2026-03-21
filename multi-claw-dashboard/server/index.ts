@@ -95,11 +95,11 @@ app.use("/api/tailscale", tailscaleRouter);
 app.use("/api/plugin-registry", pluginRegistryRouter);
 app.use("/api/templates", templatesRouter);
 app.use("/api/audit-logs", auditRouter);
-app.use("/api", delegationRouter);
 app.use("/api/memory", stateRouter);
 app.use("/api/memory", knowledgeRouter);
 app.use("/api/sandbox", sandboxRouter);
 app.use("/api/workflows", workflowsRouter);
+app.use("/api", delegationRouter); // Must be AFTER specific /api/* routes — mounted at /api so its middleware runs on all /api/* paths
 
 // Global error handler — catches unhandled errors in route handlers
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

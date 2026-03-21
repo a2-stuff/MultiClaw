@@ -109,7 +109,8 @@ def test_install_cleans_up_on_clone_failure(tmp_path):
     assert not (tmp_path / "my-plugin").exists()
 
 
-def test_install_cleans_up_if_no_skills_directory(tmp_path):
+def test_install_succeeds_with_no_skills_directory(tmp_path):
+    """Plugins without a skills/ directory are valid — skills are optional."""
     mgr = GitPluginManager(tmp_path)
 
     def fake_clone_no_skills(args, **kwargs):
@@ -121,9 +122,9 @@ def test_install_cleans_up_if_no_skills_directory(tmp_path):
     with patch("subprocess.run", side_effect=fake_clone_no_skills):
         result = mgr.install("My Plugin", "my-plugin", "https://example.com/repo.git")
 
-    assert result["success"] is False
-    assert "skills/" in result["error"] or "skills" in result["error"]
-    assert not (tmp_path / "my-plugin").exists()
+    assert result["success"] is True
+    assert result["skills"] == []
+    assert (tmp_path / "my-plugin").exists()
 
 
 # ---------------------------------------------------------------------------

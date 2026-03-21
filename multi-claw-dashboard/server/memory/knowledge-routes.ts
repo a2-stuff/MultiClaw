@@ -3,12 +3,12 @@ import { v4 as uuid } from "uuid";
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { knowledgeEntries } from "../db/schema.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuthOrAgent } from "../auth/middleware.js";
 import { auditFromReq } from "../audit/logger.js";
 import { generateEmbedding, cosineSimilarity } from "./embeddings.js";
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuthOrAgent);
 
 // Ingest knowledge entry
 router.post("/ingest", async (req, res) => {
@@ -23,7 +23,7 @@ router.post("/ingest", async (req, res) => {
       id, content,
       embedding: embedding ? JSON.stringify(embedding) : null,
       metadata: metadata ? JSON.stringify(metadata) : null,
-      createdBy: req.user?.id || null,
+      createdBy: req.agent?.id || req.user?.id || null,
       createdAt: now, updatedAt: now,
     }).run();
     auditFromReq(req, "memory.write", { type: "knowledge", id });

@@ -3,11 +3,11 @@ import { v4 as uuid } from "uuid";
 import { eq, and, lt } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { sharedState } from "../db/schema.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuthOrAgent } from "../auth/middleware.js";
 import { auditFromReq } from "../audit/logger.js";
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuthOrAgent);
 
 // List keys in a namespace
 router.get("/state/:namespace", async (req, res) => {
@@ -69,7 +69,7 @@ router.put("/state/:namespace/:key", async (req, res) => {
       const now = new Date().toISOString();
       db.insert(sharedState).values({
         id, namespace, key, value: JSON.stringify(value), version: 1,
-        createdBy: req.user?.id || null, createdAt: now, updatedAt: now,
+        createdBy: req.agent?.id || req.user?.id || null, createdAt: now, updatedAt: now,
         expiresAt: expiresAt || null,
       }).run();
       auditFromReq(req, "memory.write", { type: "state", id }, { namespace, key });
