@@ -35,6 +35,24 @@ async def install_plugin(metadata: str = Form(...), files: list[UploadFile] = Fi
 
 @router.post("/{name}/activate")
 async def activate_plugin(name: str):
+    import shutil
+    from pathlib import Path
+
+    # If plugin not in local plugins dir, copy from built-in source
+    local_dir = Path(settings.plugins_dir) / name
+    if not local_dir.exists():
+        # Built-in plugins live in the agent source tree
+        source_plugins = Path(__file__).parent.parent.parent / "plugins"
+        # Try exact name match, then with underscores (e.g. hello-plugin vs hello_plugin)
+        source_dir = source_plugins / name
+        if not source_dir.exists():
+            alt_name = name.replace("-", "_")
+            source_dir = source_plugins / alt_name
+        if source_dir.exists():
+            shutil.copytree(source_dir, local_dir)
+        else:
+            raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
     try:
         plugin_loader.load_plugin(name)
         return {"activated": True}
