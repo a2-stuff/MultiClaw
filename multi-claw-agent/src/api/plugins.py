@@ -90,11 +90,7 @@ async def uninstall_plugin(name: str):
             if git_manager.uninstall(slug):
                 return {"uninstalled": True}
 
-    # Try built-in plugin uninstall
-    # Determine if this is the main agent source tree (don't delete source files)
-    source_plugins = Path(__file__).resolve().parent.parent.parent / "plugins"
-    is_source_dir = Path(settings.plugins_dir).resolve() == source_plugins.resolve()
-
+    # Try built-in plugin uninstall — delete from plugins folder
     for slug in candidates:
         # Unload from memory
         if slug in plugin_loader.active_plugins:
@@ -102,21 +98,8 @@ async def uninstall_plugin(name: str):
 
         plugin_dir = Path(settings.plugins_dir) / slug
         if plugin_dir.exists():
-            if is_source_dir:
-                # Main agent: deactivate and mark disabled, don't delete source files
-                meta_path = plugin_dir / "plugin.json"
-                if meta_path.exists():
-                    try:
-                        meta = json.loads(meta_path.read_text())
-                        meta["enabled"] = False
-                        meta_path.write_text(json.dumps(meta, indent=2))
-                    except Exception:
-                        pass
-                return {"uninstalled": True, "note": "Plugin disabled (source files preserved)"}
-            else:
-                # Spawned agent: delete the copied plugin files
-                shutil.rmtree(plugin_dir)
-                return {"uninstalled": True}
+            shutil.rmtree(plugin_dir)
+            return {"uninstalled": True}
 
     raise HTTPException(status_code=404, detail="Plugin not found")
 
