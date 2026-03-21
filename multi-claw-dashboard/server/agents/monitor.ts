@@ -6,16 +6,38 @@ import { wsManager } from "../ws/manager.js";
 import { syncConfigToAgent } from "./config-sync.js";
 import { resolveAgentUrl } from "../tailscale/helpers.js";
 import { config } from "../config.js";
+import { startSpawnedAgent } from "./spawn.js";
 
 export class AgentMonitor {
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
 
   start() {
+    // Auto-start any locally-spawned agents that aren't running
+    this.autoStartSpawnedAgents();
     this.healthInterval = setInterval(() => this.checkAgents(), 15000);
     if (config.tailscaleEnabled) {
       this.discoveryInterval = setInterval(() => this.discoverTailscalePeers(), 60000);
       this.discoverTailscalePeers();
+    }
+  }
+
+  private autoStartSpawnedAgents() {
+    const allAgents = db.select().from(agents).all();
+    for (const agent of allAgents) {
+      if (!agent.spawnedLocally || !agent.spawnDir || agent.containerId) continue;
+      // Check if process is actually running
+      const isRunning = agent.spawnPid ? (() => {
+        try { process.kill(agent.spawnPid, 0); return true; } catch { return false; }
+      })() : false;
+      if (!isRunning) {
+        try {
+          const pid = startSpawnedAgent(agent.id);
+          console.log(`Auto-started spawned agent '${agent.name}' (PID ${pid}, port ${agent.spawnPort})`);
+        } catch (err: any) {
+          console.warn(`Failed to auto-start agent '${agent.name}': ${err.message}`);
+        }
+      }
     }
   }
 
