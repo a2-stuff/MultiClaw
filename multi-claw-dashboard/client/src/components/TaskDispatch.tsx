@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { api } from "../api/client";
+import { MentionEditor, type MentionEditorHandle } from "./MentionEditor";
 import type { Agent } from "../lib/types";
 
 interface Props {
@@ -8,107 +9,116 @@ interface Props {
 }
 
 export function TaskDispatch({ agents, onDispatched }: Props) {
-  const [prompt, setPrompt] = useState("");
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [text, setText] = useState("");
+  const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([]);
+  const editorRef = useRef<MentionEditorHandle>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
-  const toggleAgent = (id: string) => {
-    setSelectedAgents((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-    );
-  };
+  const mentionedAgents = mentionedAgentIds
+    .map(id => agents.find(a => a.id === id))
+    .filter(Boolean) as Agent[];
 
-  const dispatch = async () => {
-    if (!prompt.trim() || selectedAgents.length === 0) return;
+  const isDashboardQuery = mentionedAgentIds.length === 0;
+
+  const handleSubmit = useCallback(async () => {
+    if (!text.trim()) return;
     setSending(true);
     setError("");
     try {
-      const res = await api.post("/tasks/dispatch", {
-        prompt,
-        agentIds: selectedAgents,
-      });
-      onDispatched(res.data.orchestrationId);
-      setPrompt("");
+      if (isDashboardQuery) {
+        const res = await api.post("/tasks/ask", { prompt: text });
+        onDispatched(res.data.orchestrationId);
+      } else {
+        const res = await api.post("/tasks/dispatch", {
+          prompt: text,
+          agentIds: mentionedAgentIds,
+        });
+        onDispatched(res.data.orchestrationId);
+      }
+      setText("");
+      setMentionedAgentIds([]);
+      editorRef.current?.clear();
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to dispatch");
     } finally {
       setSending(false);
     }
+  }, [text, mentionedAgentIds, isDashboardQuery, onDispatched]);
+
+  const removeAgent = (agentId: string) => {
+    setMentionedAgentIds(prev => prev.filter(id => id !== agentId));
   };
 
-  const onlineAgents = agents.filter((a) => a.status !== "offline");
+  const offlineMentioned = mentionedAgents.filter(a => a.status === "offline");
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
       <h3 className="text-lg font-semibold mb-3">Dispatch Task</h3>
 
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Describe the task for your agents..."
-        rows={4}
-        className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none mb-3"
-      />
-
-      <div className="mb-3">
-        <p className="text-sm text-gray-400 mb-2">
-          Select agents (order = chain sequence):
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {onlineAgents.map((agent) => {
-            const selected = selectedAgents.includes(agent.id);
-            const order = selectedAgents.indexOf(agent.id) + 1;
-            return (
-              <button
+      {/* Tag bar */}
+      <div className="flex items-center gap-2 mb-2 min-h-[32px] flex-wrap">
+        {mentionedAgents.length > 0 ? (
+          <>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Dispatching to:</span>
+            {mentionedAgents.map(agent => (
+              <span
                 key={agent.id}
-                onClick={() => toggleAgent(agent.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
-                  selected
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-900/40 text-blue-400 rounded-full text-xs"
               >
-                {selected && (
-                  <span className="bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                    {order}
-                  </span>
-                )}
-                <span
-                  className={`w-2 h-2 rounded-full ${agent.status === "online" ? "bg-green-500" : "bg-yellow-500"}`}
-                />
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  agent.status === "online" ? "bg-green-500" :
+                  agent.status === "busy" ? "bg-yellow-500" :
+                  agent.status === "error" ? "bg-red-500" : "bg-gray-500"
+                }`} />
                 {agent.name}
-                <span className="text-xs text-gray-500">
-                  ({(agent as any).defaultModel || "claude-sonnet-4-6"})
-                </span>
-              </button>
-            );
-          })}
-          {onlineAgents.length === 0 && (
-            <p className="text-gray-500 text-sm">No agents online</p>
-          )}
-        </div>
+                <button
+                  onClick={() => removeAgent(agent.id)}
+                  className="text-gray-500 hover:text-white ml-1"
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+          </>
+        ) : (
+          <span className="text-gray-500 text-xs">No agents tagged — Dashboard will answer directly</span>
+        )}
       </div>
 
-      {selectedAgents.length > 1 && (
-        <p className="text-xs text-gray-500 mb-3">
-          Chain: {selectedAgents
-            .map((id) => agents.find((a) => a.id === id)?.name)
-            .join(" \u2192 ")}
+      {/* Mention editor */}
+      <MentionEditor
+        ref={editorRef}
+        agents={agents}
+        onMentionsChange={setMentionedAgentIds}
+        onTextChange={setText}
+        onSubmit={handleSubmit}
+        disabled={sending}
+      />
+
+      {/* Offline warning */}
+      {offlineMentioned.length > 0 && (
+        <p className="text-yellow-400 text-xs mt-2">
+          Warning: {offlineMentioned.map(a => a.name).join(", ")} {offlineMentioned.length === 1 ? "is" : "are"} offline and may not respond.
         </p>
       )}
 
-      {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+      {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
+      {/* Send button */}
       <button
-        onClick={dispatch}
-        disabled={sending || !prompt.trim() || selectedAgents.length === 0}
-        className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg text-white font-medium transition"
+        onClick={handleSubmit}
+        disabled={sending || !text.trim()}
+        className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg text-white font-medium transition"
       >
         {sending
-          ? "Dispatching..."
-          : `Send to ${selectedAgents.length} agent${selectedAgents.length !== 1 ? "s" : ""}`}
+          ? "Sending..."
+          : isDashboardQuery
+            ? "Ask Dashboard"
+            : `Dispatch to ${mentionedAgentIds.length} agent${mentionedAgentIds.length !== 1 ? "s" : ""}`}
       </button>
+
+      <p className="text-gray-600 text-xs mt-2 text-center">Cmd+Enter to send</p>
     </div>
   );
 }
