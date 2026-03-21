@@ -16,7 +16,12 @@ async def list_plugins():
     for n in names:
         meta = plugin_manager.get_plugin(n)
         if meta:
-            meta["active"] = n in plugin_loader.active_plugins
+            # Python plugins: active means loaded in memory
+            # Git/skills-only plugins: active if enabled in plugin.json (no Python class to load)
+            if n in plugin_loader.active_plugins:
+                meta["active"] = True
+            else:
+                meta["active"] = bool(meta.get("enabled", False))
             result.append(meta)
     return result
 
