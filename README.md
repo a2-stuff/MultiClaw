@@ -1,6 +1,6 @@
 <p align="center">
-  <img src="MultiClaw_Icon.png" alt="MultiClaw" width="200" />
-  <img src="MultiClaw_GIF_Dashboard.gif" alt="MultiClaw" width="800" />
+  <img src="MultiClaw_Icon.png" alt="MultiClaw" width="200" /><br />
+  <img src="MultiClaw_GIF_Dashboard.gif" alt="MultiClaw" width="1200" />
 </p>
 
 
