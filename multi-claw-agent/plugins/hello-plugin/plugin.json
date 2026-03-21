@@ -1,8 +1,7 @@
 {
   "name": "hello-plugin",
-  "description": "Hello world plugin",
   "version": "1.0.0",
+  "description": "Hello world plugin for testing",
   "entry_point": "main.py",
-  "installed_at": "2026-03-19T13:37:36.271322+00:00",
   "enabled": true
 }
