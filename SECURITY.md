@@ -179,6 +179,12 @@ The dashboard has its own LLM-powered administrator profile for answering direct
 - Skills are loaded via `importlib` exclusively from validated, allowlisted paths.
 - Plugins are loaded only from their validated directories.
 - Path containment is enforced before any load attempt.
+- **Plugin manifests** define post-install commands that run in restricted subprocess environments.
+- Environment variable values are injected via subprocess `env` dict, never via shell string interpolation.
+- Env var values are never logged — only key names appear in logs.
+- Python import paths in health checks are validated against `^[a-zA-Z_][a-zA-Z0-9_.]*$` to prevent code injection.
+- SSL certificate verification is only relaxed for `localhost` health checks (self-signed services like Portainer), not globally.
+- Docker containers spawned by plugins run with resource limits (512MB memory, 1.0 CPU, read-only filesystem).
 
 ### Cron Execution
 

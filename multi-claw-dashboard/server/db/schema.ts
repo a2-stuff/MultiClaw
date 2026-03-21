@@ -194,6 +194,7 @@ export const pluginRegistry = sqliteTable("plugin_registry", {
   author: text("author"),
   repoUrl: text("repo_url"),
   type: text("type").notNull().default("git-plugin"),
+  manifest: text("manifest"), // JSON string of PluginManifest
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at"),
 });
@@ -260,7 +261,7 @@ export const agentRegistryPlugins = sqliteTable("agent_registry_plugins", {
   id: text("id").primaryKey(),
   agentId: text("agent_id").notNull().references(() => agents.id),
   registryPluginId: text("registry_plugin_id").notNull().references(() => pluginRegistry.id),
-  status: text("status", { enum: ["pending", "installed", "failed", "uninstalling", "updating"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "configuring", "installing", "installed", "failed", "uninstalling", "updating"] }).notNull().default("pending"),
   installedAt: text("installed_at"),
   updatedAt: text("updated_at"),
   error: text("error"),

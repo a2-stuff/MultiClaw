@@ -2,6 +2,39 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.2.0] - 2026-03-21
+
+### Added
+- **Plugin Manifest System** — Every plugin in the registry now declares its environment variables, dependencies, post-install steps, and health checks in a structured manifest. This is the standard for all current and future plugins.
+- **Environment Variable Prompting** — Deploying a plugin that requires configuration (API keys, network settings, auth tokens) now shows a configuration modal before deployment. Required fields are validated, optional fields are collapsible, and secret values are masked.
+- **Auto-Generate Support** — Plugins like Bankr Agent and AgentPay SDK can auto-generate secrets, wallets, and API keys during installation. The UI offers an "Auto-generate" toggle for supported variables.
+- **Plugin Dependency Validation** — The deploy flow checks that all plugin dependencies are installed on the target agent before proceeding. Portainer requires Docker, AgentPay Skill Pack requires AgentPay SDK, etc. Missing dependencies are shown with clear error messages.
+- **Plugin Health Check Endpoints** — New `GET /api/plugins/{slug}/health` endpoint on each agent runs manifest-defined health checks (command, HTTP, Python import, file existence). Dashboard proxies health checks via `GET /api/plugin-registry/:id/health/:agentId`.
+- **Health Indicators in UI** — The Plugins tab now shows a Health column with green/red status dots. Click to run health checks and see detailed results for failed checks.
+- **Manifest-Driven Post-Install** — When a manifest is provided, the agent runs specific post-install steps instead of generic auto-detection. Steps run sequentially with per-step timeouts, progress tracking, and error reporting.
+- **Per-Plugin Setup Scripts** — Docker, Portainer, Browser Control (Playwright), and Tailscale have dedicated setup scripts for system-level installation with multi-distro support.
+- **10 Complete Plugin Manifests** — Superpowers, Shannon, AgentPay SDK, AgentPay Skill Pack, Bankr Agent, Docker, Portainer, Browser Control, Tailscale, and Hello Plugin all have full manifests with env vars, dependencies, post-deploy steps, and health checks.
+
+### Changed
+- Plugin deploy timeout increased from 60s to 600s for manifest-driven installs (system packages like Docker can take minutes)
+- Plugin registry API responses now include parsed manifest objects
+- Deploy route accepts `envVars` alongside `agentIds` and forwards both manifest and env vars to agents
+- `agentRegistryPlugins` status enum expanded with `"configuring"` and `"installing"` states
+- Undeploy and update routes now use `resolveAgentUrl()` for Tailscale compatibility (was using `agent.url` directly)
+- Seed registry rewritten with `upsertPlugin()` helper that backfills manifests on existing entries
+
+### Security
+- SSL verification only disabled for localhost health checks (self-signed certs), not globally
+- Python import paths validated against `^[a-zA-Z_][a-zA-Z0-9_.]*$` to prevent code injection
+- File existence checks use `expanduser()` for tilde expansion
+- Environment variable values injected via subprocess env (not shell interpolation) to prevent injection
+- Env var values never logged — only key names are logged
+
+### Database
+- New migration `0016_plugin_manifests.sql`: adds `manifest` text column to `plugin_registry` table
+
+---
+
 ## [1.1.0] - 2026-03-21
 
 ### Added
@@ -117,6 +150,7 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.2.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.2.0
 [1.1.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.1.0
 [1.0.1]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.1
 [1.0.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.0

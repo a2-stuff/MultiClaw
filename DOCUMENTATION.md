@@ -1,6 +1,6 @@
 # MultiClaw Documentation
 
-**Version:** 1.1 | **Updated:** March 2026
+**Version:** 1.2 | **Updated:** March 2026
 
 ---
 
@@ -520,43 +520,148 @@ After a skill is imported into the dashboard, it must be deployed to individual 
 
 ## Plugins
 
-Plugins extend an agent's core functionality with integrations such as Docker management, Portainer, Tailscale networking, and custom tooling.
+Plugins extend an agent's core functionality with integrations such as Docker management, Portainer, Tailscale networking, crypto trading, browser automation, and custom tooling. Every plugin ships with a **manifest** that declares its configuration requirements, dependencies, installation steps, and health checks.
 
 **Key concepts:**
 
 - Plugins are **Git-based** — each plugin is a GitHub repository cloned into the agent's plugins directory
-- **Post-install scripts** run automatically after cloning to handle setup (e.g., `pip install -r requirements.txt`)
+- Every plugin has a **manifest** declaring env vars, dependencies, post-install steps, and health checks
+- **Environment variable prompting** — the UI prompts for required configuration before deployment
+- **Dependency validation** — the deploy flow checks that all required plugins are installed first
+- **Post-install steps** run automatically after cloning — manifest-driven steps replace the old generic auto-detection
+- **Health checks** verify the plugin is installed and working after deployment
 - Plugins can be **enabled or disabled** per agent without uninstalling
 - The dashboard maintains a central **plugin registry** seeded with default plugins at startup
-- Admins can add new plugins to the registry by providing a GitHub repository URL
 
 **Plugin Registry:**
 
-The dashboard ships with a built-in plugin registry seeded with the following plugins. Admins can add additional plugins by providing a GitHub repository URL.
-
-| Plugin | Author | Type | Description |
-|--------|--------|------|-------------|
-| **Superpowers** | Jesse Vincent | git-plugin | Complete development workflow skills for AI coding agents — TDD, systematic debugging, brainstorming, code review, parallel agents, and more |
-| **Shannon** | KeygraphHQ | git-plugin | Autonomous white-box AI pentester for web applications and APIs — analyzes source code, identifies attack vectors, and executes real exploits to prove vulnerabilities |
-| **AgentPay SDK** | World Liberty Financial | git-plugin | Open SDK for agentic payments — let AI agents hold, transfer, and manage USD1 with operator-defined spending policies and self-custodial wallets on EVM-compatible networks |
-| **AgentPay Skill Pack** | World Liberty Financial | git-plugin | AI agent skill pack for wallet setup, funding, transfers, approvals, and policy configuration with AgentPay SDK — enables agents to manage USD1 payment workflows |
-| **Bankr Agent** | BankrBot | git-plugin | Crypto trading, market analysis, and Polymarket prediction betting via the Bankr API — supports Base, Ethereum, Solana, and more |
-| **Browser Control** | MultiClaw | built-in | Browser automation via Playwright — navigate pages, fill forms, click elements, extract content, take screenshots, and manage tabs with 19 agent-facing tools. Supports Chromium, Firefox, and WebKit with configurable headless/visible mode |
-| **Docker** | MultiClaw | built-in | Install and manage Docker containers on the agent host — pull images, create/start/stop/remove containers, inspect state, and control container lifecycle |
-| **Portainer** | MultiClaw | built-in | Install Portainer CE Docker management UI on the agent host for visual container management via a web-based GUI |
-| **Tailscale** | MultiClaw | built-in | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery |
-| **Hello Plugin** | MultiClaw | built-in | Minimal example plugin demonstrating the plugin interface — use as a starting point for building custom plugins |
+| Plugin | Author | Type | Env Vars | Dependencies | Health Check |
+|--------|--------|------|----------|-------------|--------------|
+| **Superpowers** | Jesse Vincent | git-plugin | — | — | Skills directory exists |
+| **Shannon** | KeygraphHQ | git-plugin | `ANTHROPIC_API_KEY` | Docker, Node.js | Docker running, API key set |
+| **AgentPay SDK** | World Liberty Financial | git-plugin | `AGENTPAY_NETWORK`, `AGENTPAY_RPC_URL` | Node.js, pnpm | Daemon responsive |
+| **AgentPay Skill Pack** | World Liberty Financial | git-plugin | — | AgentPay SDK | SDK reachable, skills exist |
+| **Bankr Agent** | BankrBot | git-plugin | `BANKR_API_KEY` | Node.js, npm | `bankr whoami` succeeds |
+| **Browser Control** | MultiClaw | built-in | — | Python, pip | Playwright importable |
+| **Docker** | MultiClaw | built-in | — | — | `docker --version`, `docker info` |
+| **Portainer** | MultiClaw | built-in | `PORTAINER_PORT` (opt) | Docker | Container running, HTTPS responds |
+| **Tailscale** | MultiClaw | built-in | `TAILSCALE_AUTH_KEY` | — | `tailscale status` connected |
+| **Hello Plugin** | MultiClaw | built-in | — | — | Activation succeeds |
 
 **Installing a plugin on an agent:**
 
 1. Open the agent's **Plugins** tab.
-2. Click **Install from Registry**.
-3. Select the desired plugin from the list.
-4. The dashboard clones the repository into the agent's plugins directory and runs any post-install scripts.
+2. Click **Install Plugin**.
+3. Select the desired plugin from the registry list.
+4. If the plugin has a manifest with env vars or dependencies:
+   - A **configuration modal** appears showing required and optional variables.
+   - Required fields must be filled (or marked for auto-generation) before deploying.
+   - Dependencies are checked — missing ones are shown with red indicators.
+   - System requirements (Docker, Node.js, etc.) are displayed as informational badges.
+5. Click **Deploy** — the dashboard forwards the manifest and env vars to the agent.
+6. The agent runs each post-install step sequentially (install packages, start services, generate keys).
+7. After installation, click the **Health** indicator to verify the plugin is working.
+
+**Health checks:**
+
+Each installed plugin shows a health indicator in the Plugins tab:
+- **Green** — all health checks pass
+- **Red** — one or more checks failed (click for details)
+- **Gray** — not yet checked (click to run)
+
+Health checks are available via the API: `GET /api/plugin-registry/:id/health/:agentId`
 
 **Enabling and disabling:**
 
 Toggle the enabled state from the Plugins tab. Disabled plugins remain installed but are not loaded by the agent.
+
+### Plugin Manifest Standard
+
+All plugins in the registry **must** include a manifest. The manifest is a JSON object stored in the `plugin_registry` database table and seeded via `seed-registry.ts`. New plugins added to the registry should follow this standard.
+
+**Manifest schema:**
+
+```json
+{
+  "envVars": [
+    {
+      "name": "API_KEY",
+      "description": "Your API key for the service",
+      "required": true,
+      "secret": true,
+      "autoGenerate": "method-name",
+      "validationRegex": "^sk_",
+      "defaultValue": ""
+    }
+  ],
+  "dependencies": [
+    {
+      "slug": "docker",
+      "reason": "This plugin runs as a Docker container"
+    }
+  ],
+  "systemRequirements": ["nodejs", "docker"],
+  "postInstallSteps": [
+    {
+      "id": "install-deps",
+      "label": "Install dependencies",
+      "type": "command",
+      "command": "npm install",
+      "timeout": 120
+    }
+  ],
+  "healthChecks": [
+    {
+      "type": "command",
+      "command": "my-cli --version",
+      "description": "CLI tool installed"
+    }
+  ]
+}
+```
+
+**Field reference:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `envVars[].name` | string | Environment variable name (e.g., `BANKR_API_KEY`) |
+| `envVars[].description` | string | Human-readable description shown in the UI |
+| `envVars[].required` | boolean | Whether the variable must be set before deploying |
+| `envVars[].secret` | boolean | Mask the value in the UI (password field) |
+| `envVars[].autoGenerate` | string? | Method name for auto-generation (e.g., `bankr-login`) |
+| `envVars[].validationRegex` | string? | Regex pattern to validate the value |
+| `envVars[].defaultValue` | string? | Pre-filled default value |
+| `dependencies[].slug` | string | Slug of a required plugin that must be installed first |
+| `dependencies[].reason` | string | Why this dependency is needed |
+| `systemRequirements[]` | string[] | System packages needed: `docker`, `nodejs`, `npm`, `pnpm`, `python`, `pip` |
+| `postInstallSteps[].id` | string | Unique identifier for progress tracking |
+| `postInstallSteps[].label` | string | Human-readable label shown in the UI |
+| `postInstallSteps[].type` | string | `"command"`, `"script"`, `"copy-skills"`, or `"verify"` |
+| `postInstallSteps[].command` | string? | Shell command or script path to execute |
+| `postInstallSteps[].timeout` | number? | Timeout in seconds (default: 300) |
+| `healthChecks[].type` | string | `"command"`, `"http"`, `"python-import"`, or `"file-exists"` |
+| `healthChecks[].command` | string? | Shell command (for `command` type) |
+| `healthChecks[].url` | string? | URL to check (for `http` type) |
+| `healthChecks[].importPath` | string? | Python module path (for `python-import` type) |
+| `healthChecks[].filePath` | string? | File path to check (for `file-exists` type, supports `~`) |
+| `healthChecks[].description` | string | What this check verifies |
+
+**Adding a new plugin to the registry:**
+
+1. Add the plugin entry and manifest to `multi-claw-dashboard/server/db/seed-registry.ts` using the `upsertPlugin()` helper.
+2. Define all required env vars, dependencies, post-install steps, and at least one health check.
+3. If the plugin needs system-level installation, add a setup script to `multi-claw-agent/src/plugins/post_deploy/`.
+4. Test deployment by deploying to an agent and verifying all health checks pass.
+
+**API endpoints:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/plugin-registry` | List all plugins with manifests and per-agent statuses |
+| `POST` | `/api/plugin-registry/:id/deploy` | Deploy with `{ agentIds, envVars }` |
+| `GET` | `/api/plugin-registry/:id/health/:agentId` | Run health checks on agent |
+| `GET` | `/api/plugin-registry/:id/manifest` | Get parsed manifest |
+| `GET` | `/api/plugins/:slug/health` | Agent-side health check endpoint |
 
 ---
 

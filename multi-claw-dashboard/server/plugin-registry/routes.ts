@@ -15,6 +15,12 @@ const BUNDLE_DIR = path.join(__dirname, "..", "uploads", "registry-plugins");
 const router = Router();
 router.use(requireAuth);
 
+// Helper: safely parse manifest JSON
+function parseManifest(raw: string | null): object | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
 // Helper: fetch a single plugin with agent statuses
 function getPluginWithStatuses(id: string) {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, id)).get();
@@ -24,7 +30,7 @@ function getPluginWithStatuses(id: string) {
     .from(agentRegistryPlugins)
     .where(eq(agentRegistryPlugins.registryPluginId, id))
     .all();
-  return { ...plugin, agents: statuses };
+  return { ...plugin, manifest: parseManifest(plugin.manifest ?? null), agents: statuses };
 }
 
 // GET / — list all registry plugins with per-agent deployment statuses
@@ -36,7 +42,7 @@ router.get("/", (_req, res) => {
       .from(agentRegistryPlugins)
       .where(eq(agentRegistryPlugins.registryPluginId, plugin.id))
       .all();
-    return { ...plugin, agents: statuses };
+    return { ...plugin, manifest: parseManifest(plugin.manifest ?? null), agents: statuses };
   });
   res.json(result);
 });
@@ -108,12 +114,49 @@ router.post("/:id/deploy", async (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
-  const { agentIds } = req.body as { agentIds: string[] };
+  const { agentIds, envVars } = req.body as { agentIds: string[]; envVars?: Record<string, string> };
   if (!Array.isArray(agentIds) || agentIds.length === 0) {
     return res.status(400).json({ error: "agentIds array required" });
   }
 
+  // Parse manifest for dependency validation and forwarding
+  const manifest = plugin.manifest ? JSON.parse(plugin.manifest) : null;
+
+  // Validate dependencies before deploying
+  if (manifest?.dependencies?.length) {
+    const allRegistryPlugins = db.select().from(pluginRegistry).all();
+    const slugToId = new Map(allRegistryPlugins.map((p) => [p.slug, p.id]));
+
+    for (const agentId of agentIds) {
+      const installedOnAgent = db
+        .select()
+        .from(agentRegistryPlugins)
+        .where(eq(agentRegistryPlugins.agentId, agentId))
+        .all()
+        .filter((r) => r.status === "installed");
+
+      const installedPluginIds = new Set(installedOnAgent.map((r) => r.registryPluginId));
+      const missing = manifest.dependencies.filter((dep: { slug: string; reason: string }) => {
+        const depId = slugToId.get(dep.slug);
+        return !depId || !installedPluginIds.has(depId);
+      });
+
+      if (missing.length > 0) {
+        return res.status(400).json({
+          error: "Missing dependencies",
+          missing: missing.map((d: { slug: string; reason: string }) => ({
+            slug: d.slug,
+            reason: d.reason,
+          })),
+          agentId,
+        });
+      }
+    }
+  }
+
   const agentRows = db.select().from(agents).where(inArray(agents.id, agentIds)).all();
+  // Use longer timeout for manifest-driven installs (600s vs 60s)
+  const deployTimeout = manifest ? 600000 : 60000;
 
   const results = await Promise.allSettled(
     agentRows.map(async (agent) => {
@@ -135,11 +178,11 @@ router.post("/:id/deploy", async (req, res) => {
           id: trackId,
           agentId: agent.id,
           registryPluginId: plugin.id,
-          status: "pending",
+          status: "installing",
         }).run();
       } else {
         db.update(agentRegistryPlugins)
-          .set({ status: "pending", error: null, updatedAt: new Date().toISOString() })
+          .set({ status: "installing", error: null, updatedAt: new Date().toISOString() })
           .where(eq(agentRegistryPlugins.id, trackId))
           .run();
       }
@@ -149,9 +192,9 @@ router.post("/:id/deploy", async (req, res) => {
         let response: Response;
 
         if (plugin.repoUrl) {
-          // Git-based plugin: clone on agent
+          // Git-based plugin: clone on agent with manifest + env vars
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 60000);
+          const timeout = setTimeout(() => controller.abort(), deployTimeout);
           response = await fetch(`${agentUrl}/api/plugins/install-git`, {
             method: "POST",
             headers: {
@@ -162,6 +205,8 @@ router.post("/:id/deploy", async (req, res) => {
               name: plugin.name,
               slug: plugin.slug,
               repo_url: plugin.repoUrl,
+              manifest: manifest || undefined,
+              env_vars: envVars || undefined,
             }),
             signal: controller.signal,
           });
@@ -270,9 +315,10 @@ router.post("/:id/undeploy", async (req, res) => {
       }
 
       try {
+        const agentUrl = resolveAgentUrl(agent);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
-        const response = await fetch(`${agent.url}/api/plugins/${plugin.slug}`, {
+        const response = await fetch(`${agentUrl}/api/plugins/${plugin.slug}`, {
           method: "DELETE",
           headers: { "X-API-Key": agent.apiKey },
           signal: controller.signal,
@@ -347,9 +393,10 @@ router.post("/:id/update", async (req, res) => {
       }
 
       try {
+        const agentUrl = resolveAgentUrl(agent);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
-        const response = await fetch(`${agent.url}/api/plugins/${plugin.slug}/update-git`, {
+        const response = await fetch(`${agentUrl}/api/plugins/${plugin.slug}/update-git`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -398,6 +445,44 @@ router.post("/:id/update", async (req, res) => {
     r.status === "fulfilled" ? r.value : { agentId: "unknown", success: false, error: String(r.reason) }
   );
   res.json(output);
+});
+
+// GET /:id/health/:agentId — proxy health check to agent
+router.get("/:id/health/:agentId", async (req, res) => {
+  const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
+  if (!plugin) return res.status(404).json({ error: "Plugin not found" });
+
+  const agent = db.select().from(agents).where(eq(agents.id, req.params.agentId)).get();
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  try {
+    const agentUrl = resolveAgentUrl(agent);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(`${agentUrl}/api/plugins/${plugin.slug}/health`, {
+      headers: { "X-API-Key": agent.apiKey },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ healthy: false, error: err?.message || "Agent unreachable" });
+  }
+});
+
+// GET /:id/manifest — get parsed manifest for a plugin
+router.get("/:id/manifest", (req, res) => {
+  const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
+  if (!plugin) return res.status(404).json({ error: "Plugin not found" });
+
+  if (!plugin.manifest) return res.json(null);
+  try {
+    res.json(JSON.parse(plugin.manifest));
+  } catch {
+    res.json(null);
+  }
 });
 
 export { router as pluginRegistryRouter };

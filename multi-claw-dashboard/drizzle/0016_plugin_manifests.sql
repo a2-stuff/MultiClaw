@@ -1,0 +1,1 @@
+ALTER TABLE `plugin_registry` ADD `manifest` text;

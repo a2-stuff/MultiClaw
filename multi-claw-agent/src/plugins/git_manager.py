@@ -29,13 +29,26 @@ class GitPluginManager:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
-    def install(self, name: str, slug: str, repo_url: str) -> dict:
+    def install(
+        self,
+        name: str,
+        slug: str,
+        repo_url: str,
+        manifest: dict | None = None,
+        env_vars: dict | None = None,
+    ) -> dict:
         """
         Shallow-clone repo_url into plugins_dir/slug/repo/.
         Discovers SKILL.md files, writes plugin.json, and returns metadata dict.
         Idempotent: if the repo directory already exists, skips clone.
         Cleans up on failure.
+
+        If *manifest* is provided, runs manifest-driven post-install steps
+        instead of the generic auto-detect logic.  *env_vars* are injected
+        into the subprocess environment for manifest steps.
         """
+        from src.plugins.manifest import ManifestRunner, parse_manifest
+
         # Validate repo URL
         if not repo_url.startswith(("https://", "git@")):
             return {"success": False, "error": "Only HTTPS and SSH git URLs are allowed"}
@@ -70,8 +83,30 @@ class GitPluginManager:
                 shutil.rmtree(plugin_dir, ignore_errors=True)
                 return {"success": False, "error": str(e)}
 
-        # Run post-install setup
-        install_result = self._run_post_install(slug, plugin_dir, repo_dir)
+        # Run post-install: manifest-driven if provided, else generic auto-detect
+        install_result: dict = {"method": "none"}
+        step_results: list[dict] = []
+
+        if manifest:
+            parsed = parse_manifest(manifest)
+            runner = ManifestRunner(self.plugins_dir)
+            for step_res in runner.run_post_install_steps(
+                slug, parsed, env_vars=env_vars, plugin_dir=repo_dir
+            ):
+                step_results.append({
+                    "step_id": step_res.step_id,
+                    "status": step_res.status,
+                    "output": step_res.output,
+                    "error": step_res.error,
+                })
+            install_result["method"] = "manifest"
+            failed_steps = [s for s in step_results if s["status"] == "failed"]
+            if failed_steps:
+                install_result["error"] = "; ".join(
+                    f"{s['step_id']}: {s['error']}" for s in failed_steps
+                )
+        else:
+            install_result = self._run_post_install(slug, plugin_dir, repo_dir)
 
         # Discover skills (optional — not all plugins have a skills/ dir)
         skills_path = repo_dir / "skills"
@@ -95,6 +130,11 @@ class GitPluginManager:
             metadata["container_name"] = f"multiclaw-{slug}"
         if install_result.get("log_file"):
             metadata["install_log"] = install_result["log_file"]
+        # Persist manifest for health checks
+        if manifest:
+            metadata["manifest"] = manifest
+        if step_results:
+            metadata["post_install_steps"] = step_results
 
         self._write_metadata(plugin_dir, metadata)
 

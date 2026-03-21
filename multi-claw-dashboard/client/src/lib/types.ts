@@ -135,7 +135,7 @@ export interface AgentStats {
 
 export interface AgentPluginStatus {
   agentId: string;
-  status: "pending" | "installed" | "failed" | "uninstalling" | "updating";
+  status: "pending" | "configuring" | "installing" | "installed" | "failed" | "uninstalling" | "updating";
   installedAt: string | null;
   updatedAt: string | null;
   error: string | null;
@@ -152,6 +152,18 @@ export interface RegistryPlugin {
   type: string;
   createdAt: string;
   agents: AgentPluginStatus[];
+  manifest?: PluginManifest | null;
+}
+
+export interface PluginHealthResult {
+  healthy: boolean;
+  checks: Array<{
+    type: string;
+    description: string;
+    passed: boolean;
+    output?: string;
+    error?: string;
+  }>;
 }
 
 export interface DeployResult {
@@ -159,4 +171,46 @@ export interface DeployResult {
   success: boolean;
   error?: string;
   skills_count?: number;
+}
+
+// --- Plugin Manifest Types ---
+
+export interface PluginEnvVar {
+  name: string;
+  description: string;
+  required: boolean;
+  secret: boolean;
+  autoGenerate?: string;
+  validationRegex?: string;
+  defaultValue?: string;
+}
+
+export interface PluginDependency {
+  slug: string;
+  reason: string;
+}
+
+export interface PluginPostStep {
+  id: string;
+  label: string;
+  type: "command" | "script" | "copy-skills" | "verify";
+  command?: string;
+  timeout?: number;
+}
+
+export interface PluginHealthCheck {
+  type: "command" | "http" | "python-import" | "file-exists";
+  command?: string;
+  url?: string;
+  importPath?: string;
+  filePath?: string;
+  description: string;
+}
+
+export interface PluginManifest {
+  envVars: PluginEnvVar[];
+  dependencies: PluginDependency[];
+  systemRequirements: string[];
+  postInstallSteps: PluginPostStep[];
+  healthChecks: PluginHealthCheck[];
 }
