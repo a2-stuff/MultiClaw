@@ -3,7 +3,7 @@ import { v4 as uuid } from "uuid";
 import crypto from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { agents, agentSkills, agentPlugins, agentTasks, skills, plugins, apiKeys } from "../db/schema.js";
+import { agents, agentSkills, agentPlugins, agentRegistryPlugins, agentTasks, skills, plugins, pluginRegistry, apiKeys } from "../db/schema.js";
 import { requireAuth, requireRole } from "../auth/middleware.js";
 import { resolveAgentUrl } from "../tailscale/helpers.js";
 import { validateAgentUrl } from "./url-validation.js";
@@ -370,8 +370,37 @@ router.patch("/:id/plugins/:pluginId", requireRole("canManageAgents"), async (re
 });
 
 router.delete("/:id/plugins/:pluginId", requireRole("canManageAgents"), async (req, res) => {
+  const agent = db.select().from(agents).where(eq(agents.id, req.params.id)).get();
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  const pluginIdOrSlug = req.params.pluginId;
+
+  // 1. Tell the agent to uninstall the plugin
+  try {
+    const agentUrl = resolveAgentUrl(agent);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    await fetch(`${agentUrl}/api/plugins/${pluginIdOrSlug}`, {
+      method: "DELETE",
+      headers: { "X-API-Key": agent.apiKey },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch {
+    // Agent may be offline — still clean up DB
+  }
+
+  // 2. Clean up legacy agentPlugins table
   db.delete(agentPlugins)
-    .where(and(eq(agentPlugins.agentId, req.params.id), eq(agentPlugins.pluginId, req.params.pluginId))).run();
+    .where(and(eq(agentPlugins.agentId, req.params.id), eq(agentPlugins.pluginId, pluginIdOrSlug))).run();
+
+  // 3. Clean up registry tracking (agentRegistryPlugins) by slug match
+  const regPlugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.slug, pluginIdOrSlug)).get();
+  if (regPlugin) {
+    db.delete(agentRegistryPlugins)
+      .where(and(eq(agentRegistryPlugins.agentId, req.params.id), eq(agentRegistryPlugins.registryPluginId, regPlugin.id))).run();
+  }
+
   res.json({ success: true });
 });
 
