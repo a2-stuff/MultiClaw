@@ -606,16 +606,37 @@ TLSEOF
     # Dashboard connection
     echo ""
     echo -e "${YELLOW}Dashboard Connection${NC}"
-    echo "  You need an API key from your MultiClaw dashboard (Keys page)."
+    echo "  To connect this agent to your dashboard, you need:"
+    echo "    1. The dashboard URL (e.g. http://your-server:3100)"
+    echo "    2. An API key from Dashboard → Keys page (starts with mck_)"
     echo ""
-    read -p "API Key (mck_...): " AGENT_API_KEY
 
     if [[ "${TAILSCALE_ENABLED}" == "true" ]]; then
       echo "  Tailscale enabled — Dashboard URL will be discovered automatically."
       DASHBOARD_URL=""
     else
-      read -p "Dashboard URL (e.g. http://192.168.1.10:3100): " DASHBOARD_URL
+      while true; do
+        read -p "Dashboard URL (e.g. http://192.168.1.10:3100): " DASHBOARD_URL
+        if [[ -z "$DASHBOARD_URL" ]]; then
+          echo -e "  ${RED}Dashboard URL is required for remote agents.${NC}"
+        elif [[ ! "$DASHBOARD_URL" =~ ^https?:// ]]; then
+          echo -e "  ${RED}URL must start with http:// or https://${NC}"
+        else
+          break
+        fi
+      done
     fi
+
+    while true; do
+      read -p "API Key (mck_...): " AGENT_API_KEY
+      if [[ -z "$AGENT_API_KEY" ]]; then
+        echo -e "  ${RED}API key is required. Generate one in Dashboard → Keys.${NC}"
+      elif [[ ! "$AGENT_API_KEY" =~ ^mck_ ]]; then
+        echo -e "  ${RED}API key should start with 'mck_'. Check Dashboard → Keys.${NC}"
+      else
+        break
+      fi
+    done
 
     # Agent URL
     DETECTED_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")

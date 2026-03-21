@@ -246,17 +246,32 @@ MultiClaw supports two types of agents:
 
 ### Registering a Remote Agent
 
-Use this when an agent is already running on another server or VM.
+Use this when installing an agent on a separate server or VM.
 
-1. Navigate to the **Agents** page and click **+ Add** in the sidebar.
-2. Enter a display name and the full URL of the remote agent (e.g., `http://192.168.1.50:8100`).
-3. An API key is generated and displayed. **Copy this key immediately** — it is shown only once.
-4. On the remote machine, open the agent's `.env` file and set:
-   ```env
-   MULTICLAW_API_KEY=mck_your_key_here
-   MULTICLAW_DASHBOARD_URL=http://your-dashboard-ip:3100
-   ```
-5. Restart the remote agent. It will authenticate with the dashboard using the key and appear as online.
+**Step 1 — Generate an API key on the dashboard:**
+
+1. Navigate to the **Keys** page in the dashboard.
+2. Create a new API key and **copy it** — it starts with `mck_` and is shown only once.
+
+**Step 2 — Install the agent on the remote server:**
+
+Run the installer and choose option 2 (Install Agent). The installer will prompt for:
+
+- **Dashboard URL** — the full URL of your dashboard (e.g., `http://your-server-ip:3100`)
+- **API Key** — the `mck_...` key you generated in step 1
+
+The installer writes these values to `.env` automatically so you don't need to edit it manually.
+
+**Step 3 — Start the agent:**
+
+```bash
+source .venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8100
+```
+
+The agent will authenticate with the dashboard on startup and appear as online.
+
+> **Note:** If you prefer to register the agent from the dashboard side instead, go to **Agents → + Add**, enter the agent's URL, and copy the generated key to the agent's `.env` file.
 
 ### Spawning Local Agents
 
