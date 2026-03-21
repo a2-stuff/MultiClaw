@@ -147,10 +147,7 @@ export function stopSpawnedAgent(agentId: string): void {
     }
   }
 
-  if (!killed && !agent.spawnPid && !agent.spawnPort) {
-    throw new Error("Agent has no PID or port to stop");
-  }
-
+  // Always update DB — even if process was already dead, ensure clean state
   db.update(agents).set({ status: "offline", spawnPid: null }).where(eq(agents.id, agentId)).run();
 }
 

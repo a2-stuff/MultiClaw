@@ -38,7 +38,7 @@ export function AgentOverviewTab({ agent }: { agent: Agent }) {
     api.get(`/agents/${agent.id}/stats`).then((res) => setStats(res.data)).catch(() => {});
     const interval = setInterval(() => {
       api.get(`/agents/${agent.id}`).then((res) => setDetail(res.data)).catch(() => {});
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [agent.id]);
 
@@ -67,8 +67,16 @@ export function AgentOverviewTab({ agent }: { agent: Agent }) {
     if (!confirm("Restart this agent? It will be briefly offline.")) return;
     setRestarting(true);
     try {
-      await api.post(`/agents/${agent.id}/restart`);
-      setUpdateMsg({ text: "Agent restarting...", ok: true });
+      // For spawned agents that are offline, use stop+start instead of proxy
+      if (agent.spawnedLocally && !agent.containerId && (agent.status === "offline" || agent.status === "error")) {
+        try { await api.post(`/agents/${agent.id}/stop-spawned`); } catch {}
+        await new Promise((r) => setTimeout(r, 1000));
+        await api.post(`/agents/${agent.id}/start-spawned`);
+        setUpdateMsg({ text: "Agent restarting...", ok: true });
+      } else {
+        await api.post(`/agents/${agent.id}/restart`);
+        setUpdateMsg({ text: "Agent restarting...", ok: true });
+      }
       setTimeout(async () => {
         for (let i = 0; i < 10; i++) {
           await new Promise((r) => setTimeout(r, 2000));
