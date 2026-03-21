@@ -103,8 +103,16 @@ async def uninstall_plugin(name: str):
         plugin_dir = Path(settings.plugins_dir) / slug
         if plugin_dir.exists():
             if is_source_dir:
-                # Main agent: just deactivate, don't delete source files
-                return {"uninstalled": True, "note": "Plugin deactivated (source files preserved)"}
+                # Main agent: deactivate and mark disabled, don't delete source files
+                meta_path = plugin_dir / "plugin.json"
+                if meta_path.exists():
+                    try:
+                        meta = json.loads(meta_path.read_text())
+                        meta["enabled"] = False
+                        meta_path.write_text(json.dumps(meta, indent=2))
+                    except Exception:
+                        pass
+                return {"uninstalled": True, "note": "Plugin disabled (source files preserved)"}
             else:
                 # Spawned agent: delete the copied plugin files
                 shutil.rmtree(plugin_dir)
