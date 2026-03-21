@@ -140,11 +140,13 @@ export function AgentPluginsTab({ agent, canManage }: { agent: Agent; canManage:
   );
   const installedPluginNames = new Set(agentPlugins.map((p) => p.pluginName.toLowerCase()));
 
-  // Match agent plugins to registry plugins for health checks
+  // Match agent plugins to registry plugins for health checks (by slug, regardless of deploy status)
   const pluginToRegistry = new Map<string, RegistryPlugin>();
   for (const rp of registryPlugins) {
-    if (rp.agents?.some((a) => a.agentId === agent.id && a.status === "installed")) {
-      pluginToRegistry.set(rp.slug?.toLowerCase(), rp);
+    if (rp.slug) {
+      pluginToRegistry.set(rp.slug.toLowerCase(), rp);
+      // Also map underscore variant (browser_control -> browser-control)
+      pluginToRegistry.set(rp.slug.toLowerCase().replace(/-/g, "_"), rp);
     }
   }
 
