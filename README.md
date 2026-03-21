@@ -52,7 +52,8 @@ MultiClaw is a self-hosted platform for managing fleets of AI agents. A central 
 
 **What you can do with MultiClaw:**
 
-- Dispatch tasks to any agent and stream responses in real time via SSE and WebSocket
+- Dispatch tasks using @mention tagging — type `@` to tag agents, or ask the dashboard directly
+- Run tasks in parallel across multiple agents with automatic result synthesis
 - Spawn isolated local agents with a single click — each gets its own virtualenv, port, and working directory under `~/.multiclaw/agents/`
 - Register and manage remote agents running on any host in your infrastructure
 - Give each agent a unique identity with a custom system prompt (supports `.md` file upload)
@@ -222,9 +223,15 @@ The Agents page is the primary fleet view. Each agent card shows its name, host,
 - **Crons** — manage scheduled recurring commands for this agent
 - **Settings** — per-agent configuration (provider, model, port, etc.)
 
-### Tasks
+### Tasks & @Mention Dispatch
 
-Dispatch a task to any agent from the Tasks page. Responses stream in real time via SSE and WebSocket. Full task history is stored and browsable, with delete support to keep history clean.
+The task dispatch system uses **@mention tagging** — type `@` in the prompt to get a Slack-style autocomplete dropdown showing all agents with live status indicators. Tagged agents appear as inline blue pills. The dispatch routing is automatic:
+
+- **No agents tagged** → The dashboard answers directly using its built-in administrator profile and database access
+- **1 agent tagged** → Direct dispatch to that agent
+- **2+ agents tagged** → Parallel dispatch to all agents simultaneously, with a dashboard synthesis summarizing all results
+
+Responses stream in real time via SSE and WebSocket. For parallel execution, each agent's result appears as it completes, followed by a unified **Dashboard Summary** card that synthesizes all responses. Full task history is stored and browsable.
 
 ### Skills Marketplace
 
@@ -299,6 +306,7 @@ Role-based access control with three roles:
 ### Settings
 
 - Configure AI provider API keys (Anthropic, OpenAI, Google, OpenRouter, DeepSeek)
+- **Dashboard Profile** — customize the dashboard's AI administrator personality and view auto-injected live context (agent list, statuses, capabilities)
 - Push settings to all connected agents simultaneously (config sync)
 - Manage allowed CORS origins dynamically without restarting the server
 - General dashboard configuration
