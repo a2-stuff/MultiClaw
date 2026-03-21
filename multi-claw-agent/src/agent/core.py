@@ -1,5 +1,9 @@
+import logging
 from src.config import settings
 from src.agent.providers import ProviderRegistry
+from src.agent.tool_executor import generate_tool_schema, execute_tool
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class AgentBrain:
@@ -45,6 +49,111 @@ class AgentBrain:
         p, m = self._resolve_provider(provider, model)
         async for text in p.run_stream(prompt, m, system=system, max_tokens=self.max_tokens):
             yield text
+
+    async def run_agentic(
+        self,
+        prompt: str,
+        system: str = "",
+        provider: str = "",
+        model: str = "",
+        tools: list[dict] | None = None,
+        max_turns: int = 10,
+    ) -> dict:
+        """Run a multi-turn agentic loop with tool calling.
+
+        Args:
+            prompt: User prompt
+            system: System prompt (should include tool context)
+            provider/model: LLM provider and model
+            tools: Raw plugin tools with handlers
+            max_turns: Max agentic loop iterations
+
+        Returns:
+            {output, usage, tool_calls_log, turns}
+        """
+        p, m = self._resolve_provider(provider, model)
+
+        # If no tools, fall back to single-shot
+        if not tools:
+            result = await p.run(prompt, m, system=system, max_tokens=self.max_tokens)
+            return {
+                "output": result["output"],
+                "usage": result["usage"],
+                "tool_calls_log": [],
+                "turns": 1,
+            }
+
+        # Build canonical tool schemas for the provider
+        canonical_tools = [generate_tool_schema(t) for t in tools]
+
+        # Start conversation
+        messages = [{"role": "user", "content": prompt}]
+        total_usage = {"input_tokens": 0, "output_tokens": 0}
+        tool_calls_log: list[dict] = []
+
+        for turn in range(max_turns):
+            response = await p.run_with_tools(
+                messages=messages,
+                tools=canonical_tools,
+                model=m,
+                system=system,
+                max_tokens=self.max_tokens,
+            )
+
+            # Accumulate token usage
+            total_usage["input_tokens"] += response["usage"]["input_tokens"]
+            total_usage["output_tokens"] += response["usage"]["output_tokens"]
+
+            # No tool calls — we have a final text response
+            if not response["tool_calls"]:
+                return {
+                    "output": response["content"],
+                    "usage": total_usage,
+                    "tool_calls_log": tool_calls_log,
+                    "turns": turn + 1,
+                }
+
+            # Append assistant message with tool calls
+            messages.append({
+                "role": "assistant",
+                "content": response["content"],
+                "tool_calls": response["tool_calls"],
+            })
+
+            # Execute each tool call and append results
+            for tc in response["tool_calls"]:
+                logger.info(f"Executing tool: {tc['name']}({tc['arguments']})")
+                result = await execute_tool(tc["name"], tc["arguments"], tools)
+
+                tool_calls_log.append({
+                    "turn": turn + 1,
+                    "tool": tc["name"],
+                    "arguments": tc["arguments"],
+                    "result_preview": result[:200] if len(result) > 200 else result,
+                })
+
+                tool_msg = {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result,
+                    "tool_name": tc["name"],  # Needed for Gemini
+                }
+                messages.append(tool_msg)
+
+        # Max turns exhausted — return whatever we have
+        last_content = response["content"] if response.get("content") else ""
+        if not last_content:
+            last_content = (
+                f"[Agent reached max turns ({max_turns}). "
+                f"Executed {len(tool_calls_log)} tool calls. Last tool results are available.]"
+            )
+
+        return {
+            "output": last_content,
+            "usage": total_usage,
+            "tool_calls_log": tool_calls_log,
+            "turns": max_turns,
+        }
 
     def get_status(self) -> dict:
         return {

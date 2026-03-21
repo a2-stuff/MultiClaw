@@ -42,6 +42,9 @@ class TaskResponse(BaseModel):
     error: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+    tool_calls_log: list[dict] = Field(default_factory=list)
+    turns: int = 1
+    usage: dict = Field(default_factory=dict)
 
 class SkillMetadata(BaseModel):
     name: str
