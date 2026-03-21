@@ -191,7 +191,45 @@ router.post("/:id/deploy", async (req, res) => {
         const agentUrl = resolveAgentUrl(agent);
         let response: Response;
 
-        if (plugin.repoUrl) {
+        if (plugin.type === "built-in") {
+          // Built-in plugin: activate on agent (already on filesystem) + run manifest steps
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), deployTimeout);
+          response = await fetch(`${agentUrl}/api/plugins/${plugin.slug}/activate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": agent.apiKey,
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          // If manifest has post-install steps, run them via a separate call
+          if (manifest?.postInstallSteps?.length) {
+            const stepController = new AbortController();
+            const stepTimeout = setTimeout(() => stepController.abort(), deployTimeout);
+            const stepResponse = await fetch(`${agentUrl}/api/plugins/run-manifest`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": agent.apiKey,
+              },
+              body: JSON.stringify({
+                slug: plugin.slug,
+                manifest,
+                env_vars: envVars || {},
+              }),
+              signal: stepController.signal,
+            });
+            clearTimeout(stepTimeout);
+            // If manifest steps fail, log but don't block — plugin is activated
+            if (!stepResponse.ok) {
+              const stepErr = await stepResponse.text().catch(() => "");
+              console.warn(`Manifest steps for ${plugin.slug} on ${agent.name}: ${stepErr}`);
+            }
+          }
+        } else if (plugin.repoUrl) {
           // Git-based plugin: clone on agent with manifest + env vars
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), deployTimeout);
@@ -314,6 +352,7 @@ router.post("/:id/undeploy", async (req, res) => {
           .run();
       }
 
+      let agentError: string | null = null;
       try {
         const agentUrl = resolveAgentUrl(agent);
         const controller = new AbortController();
@@ -326,31 +365,17 @@ router.post("/:id/undeploy", async (req, res) => {
         clearTimeout(timeout);
 
         if (!response.ok && response.status !== 404) {
-          const errBody = await response.text().catch(() => "unknown error");
-          if (trackRow) {
-            db.update(agentRegistryPlugins)
-              .set({ status: "failed", error: errBody, updatedAt: new Date().toISOString() })
-              .where(eq(agentRegistryPlugins.id, trackRow.id))
-              .run();
-          }
-          return { agentId: agent.id, success: false, error: errBody };
+          agentError = await response.text().catch(() => "unknown error");
         }
       } catch (err: any) {
-        const errMsg = err?.message || String(err);
-        if (trackRow) {
-          db.update(agentRegistryPlugins)
-            .set({ status: "failed", error: errMsg, updatedAt: new Date().toISOString() })
-            .where(eq(agentRegistryPlugins.id, trackRow.id))
-            .run();
-        }
-        return { agentId: agent.id, success: false, error: errMsg };
+        agentError = err?.message || String(err);
       }
 
-      // Remove tracking row on success
+      // Always remove tracking row on undeploy — user explicitly wants it gone
       if (trackRow) {
         db.delete(agentRegistryPlugins).where(eq(agentRegistryPlugins.id, trackRow.id)).run();
       }
-      return { agentId: agent.id, success: true };
+      return { agentId: agent.id, success: true, warning: agentError || undefined };
     })
   );
 

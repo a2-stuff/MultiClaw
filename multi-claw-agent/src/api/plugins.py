@@ -48,8 +48,10 @@ async def deactivate_plugin(name: str):
 @router.delete("/{name}")
 async def uninstall_plugin(name: str):
     from src.api.git_plugins import git_manager
-    if git_manager.is_git_plugin(name):
-        if git_manager.uninstall(name):
+    # Resolve name/slug — dashboard sends slug, UI might send name
+    slug = git_manager.find_slug_by_name(name) or name
+    if git_manager.is_git_plugin(slug):
+        if git_manager.uninstall(slug):
             return {"uninstalled": True}
         raise HTTPException(status_code=404, detail="Plugin not found")
     plugin_loader.unload_plugin(name)

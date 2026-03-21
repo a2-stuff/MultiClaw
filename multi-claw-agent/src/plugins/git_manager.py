@@ -236,20 +236,41 @@ class GitPluginManager:
         except Exception:
             return None
 
-    def is_git_plugin(self, name: str) -> bool:
+    def is_git_plugin(self, name_or_slug: str) -> bool:
         """
-        Check whether the installed plugin identified by *name* is a git-plugin.
-        Searches all slug directories for a plugin.json whose 'name' field matches.
+        Check whether the installed plugin identified by *name_or_slug* is a git-plugin.
+        Checks slug directory first, then searches by plugin.json name field.
         """
         if not self.plugins_dir.exists():
             return False
+        # Direct slug match
+        meta = self.get_metadata(name_or_slug)
+        if meta and meta.get("type") == "git-plugin":
+            return True
+        # Fallback: search by name
         for slug_dir in self.plugins_dir.iterdir():
             if not slug_dir.is_dir():
                 continue
             meta = self.get_metadata(slug_dir.name)
-            if meta and meta.get("name") == name and meta.get("type") == "git-plugin":
+            if meta and meta.get("name") == name_or_slug and meta.get("type") == "git-plugin":
                 return True
         return False
+
+    def find_slug_by_name(self, name: str) -> str | None:
+        """Find the slug directory for a plugin given its display name."""
+        if not self.plugins_dir.exists():
+            return None
+        # Direct match (name == slug)
+        if (self.plugins_dir / name).exists():
+            return name
+        # Search by metadata name
+        for slug_dir in self.plugins_dir.iterdir():
+            if not slug_dir.is_dir():
+                continue
+            meta = self.get_metadata(slug_dir.name)
+            if meta and meta.get("name") == name:
+                return slug_dir.name
+        return None
 
     def discover_skills(self, skills_path: Path) -> list[dict]:
         """

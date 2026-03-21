@@ -18,6 +18,42 @@ class InstallGitRequest(BaseModel):
     env_vars: dict | None = None
 
 
+class RunManifestRequest(BaseModel):
+    slug: str
+    manifest: dict
+    env_vars: dict | None = None
+
+
+@router.post("/run-manifest")
+async def run_manifest_steps(body: RunManifestRequest):
+    """Run manifest post-install steps on an already-installed plugin."""
+    from pathlib import Path
+
+    parsed = parse_manifest(body.manifest)
+    plugin_dir = Path(settings.plugins_dir) / body.slug
+    if not plugin_dir.exists():
+        # For built-in plugins, use the plugins dir directly
+        plugin_dir = Path(settings.plugins_dir)
+
+    step_results = []
+    for step_res in manifest_runner.run_post_install_steps(
+        body.slug, parsed, env_vars=body.env_vars, plugin_dir=plugin_dir
+    ):
+        step_results.append({
+            "step_id": step_res.step_id,
+            "status": step_res.status,
+            "output": step_res.output,
+            "error": step_res.error,
+        })
+
+    failed = [s for s in step_results if s["status"] == "failed"]
+    return {
+        "success": len(failed) == 0,
+        "steps": step_results,
+        "error": "; ".join(f"{s['step_id']}: {s['error']}" for s in failed) if failed else None,
+    }
+
+
 @router.post("/install-git")
 async def install_git_plugin(body: InstallGitRequest):
     result = git_manager.install(
