@@ -378,18 +378,23 @@ router.delete("/:id/plugins/:pluginId", requireRole("canManageAgents"), async (r
   const pluginIdOrSlug = req.params.pluginId;
 
   // 1. Tell the agent to uninstall the plugin
+  let agentError: string | undefined;
   try {
     const agentUrl = resolveAgentUrl(agent);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    await fetch(`${agentUrl}/api/plugins/${pluginIdOrSlug}`, {
+    const agentResp = await fetch(`${agentUrl}/api/plugins/${pluginIdOrSlug}`, {
       method: "DELETE",
       headers: { "X-API-Key": agent.apiKey },
       signal: controller.signal,
     });
     clearTimeout(timeout);
-  } catch {
-    // Agent may be offline — still clean up DB
+    if (!agentResp.ok) {
+      const body = await agentResp.text().catch(() => "");
+      agentError = body || `Agent returned ${agentResp.status}`;
+    }
+  } catch (err: any) {
+    agentError = err?.message || "Agent unreachable";
   }
 
   // 2. Clean up legacy agentPlugins table
@@ -409,7 +414,7 @@ router.delete("/:id/plugins/:pluginId", requireRole("canManageAgents"), async (r
     }
   }
 
-  res.json({ success: true });
+  res.json({ success: true, ...(agentError ? { agentError } : {}) });
 });
 
 export { router as agentsRouter };

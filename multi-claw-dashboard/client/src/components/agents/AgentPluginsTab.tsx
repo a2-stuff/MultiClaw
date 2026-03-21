@@ -121,7 +121,10 @@ export function AgentPluginsTab({ agent, canManage }: { agent: Agent; canManage:
     if (!confirm(`Remove "${pluginName}" from ${agent.name}? This will uninstall the plugin and delete its files from the agent.`)) return;
     setError("");
     try {
-      await api.delete(`/agents/${agent.id}/plugins/${pluginName}`);
+      const resp = await api.delete(`/agents/${agent.id}/plugins/${pluginName}`);
+      if (resp.data?.agentError) {
+        setError(`Removed from dashboard, but agent reported: ${resp.data.agentError}`);
+      }
       fetchPlugins();
     } catch (err: any) {
       setError(err.response?.data?.error || `Failed to remove ${pluginName}`);
