@@ -117,11 +117,15 @@ export function AgentPluginsTab({ agent, canManage }: { agent: Agent; canManage:
     } catch {}
   };
 
-  const removePlugin = async (pluginId: string) => {
+  const removePlugin = async (pluginName: string) => {
+    if (!confirm(`Remove "${pluginName}" from ${agent.name}? This will uninstall the plugin and delete its files from the agent.`)) return;
+    setError("");
     try {
-      await api.delete(`/agents/${agent.id}/plugins/${pluginId}`);
+      await api.delete(`/agents/${agent.id}/plugins/${pluginName}`);
       fetchPlugins();
-    } catch {}
+    } catch (err: any) {
+      setError(err.response?.data?.error || `Failed to remove ${pluginName}`);
+    }
   };
 
   if (loading) return <p className="text-gray-400 text-sm">Loading plugins...</p>;

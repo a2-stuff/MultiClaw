@@ -73,15 +73,34 @@ async def deactivate_plugin(name: str):
 
 @router.delete("/{name}")
 async def uninstall_plugin(name: str):
+    import shutil
+    from pathlib import Path
     from src.api.git_plugins import git_manager
-    # Resolve name/slug — dashboard sends slug, UI might send name
-    slug = git_manager.find_slug_by_name(name) or name
-    if git_manager.is_git_plugin(slug):
-        if git_manager.uninstall(slug):
+
+    # Resolve name/slug — try original, underscore variant, and dash variant
+    candidates = [name]
+    if "-" in name:
+        candidates.append(name.replace("-", "_"))
+    elif "_" in name:
+        candidates.append(name.replace("_", "-"))
+
+    # Try git plugin uninstall first
+    for slug in candidates:
+        if git_manager.is_git_plugin(slug):
+            if git_manager.uninstall(slug):
+                return {"uninstalled": True}
+
+    # Try built-in plugin uninstall
+    for slug in candidates:
+        # Unload from memory
+        if slug in plugin_loader.active_plugins:
+            plugin_loader.unload_plugin(slug)
+        # Remove from disk
+        plugin_dir = Path(settings.plugins_dir) / slug
+        if plugin_dir.exists():
+            shutil.rmtree(plugin_dir)
             return {"uninstalled": True}
-        raise HTTPException(status_code=404, detail="Plugin not found")
-    plugin_loader.unload_plugin(name)
-    if plugin_manager.uninstall(name): return {"uninstalled": True}
+
     raise HTTPException(status_code=404, detail="Plugin not found")
 
 @router.get("/tools")

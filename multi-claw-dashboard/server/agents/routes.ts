@@ -394,11 +394,17 @@ router.delete("/:id/plugins/:pluginId", requireRole("canManageAgents"), async (r
   db.delete(agentPlugins)
     .where(and(eq(agentPlugins.agentId, req.params.id), eq(agentPlugins.pluginId, pluginIdOrSlug))).run();
 
-  // 3. Clean up registry tracking (agentRegistryPlugins) by slug match
-  const regPlugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.slug, pluginIdOrSlug)).get();
-  if (regPlugin) {
-    db.delete(agentRegistryPlugins)
-      .where(and(eq(agentRegistryPlugins.agentId, req.params.id), eq(agentRegistryPlugins.registryPluginId, regPlugin.id))).run();
+  // 3. Clean up registry tracking (agentRegistryPlugins) by slug match (try both dash/underscore variants)
+  const slugVariants = [pluginIdOrSlug];
+  if (pluginIdOrSlug.includes("-")) slugVariants.push(pluginIdOrSlug.replace(/-/g, "_"));
+  else if (pluginIdOrSlug.includes("_")) slugVariants.push(pluginIdOrSlug.replace(/_/g, "-"));
+  for (const variant of slugVariants) {
+    const regPlugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.slug, variant)).get();
+    if (regPlugin) {
+      db.delete(agentRegistryPlugins)
+        .where(and(eq(agentRegistryPlugins.agentId, req.params.id), eq(agentRegistryPlugins.registryPluginId, regPlugin.id))).run();
+      break;
+    }
   }
 
   res.json({ success: true });
