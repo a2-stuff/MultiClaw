@@ -196,12 +196,17 @@ function upsertPlugin(
     db.insert(pluginRegistry)
       .values({ id: uuid(), slug, manifest, ...values })
       .run();
-  } else if (!existing.manifest && manifest) {
-    // Backfill manifest for existing entries
-    db.update(pluginRegistry)
-      .set({ manifest, updatedAt: new Date().toISOString() })
-      .where(sql`${pluginRegistry.slug} = ${slug}`)
-      .run();
+  } else {
+    // Sync manifest and type for existing entries
+    const updates: Record<string, string | null> = { updatedAt: new Date().toISOString() };
+    if (!existing.manifest && manifest) updates.manifest = manifest;
+    if (existing.type !== values.type) updates.type = values.type;
+    if (Object.keys(updates).length > 1) {
+      db.update(pluginRegistry)
+        .set(updates)
+        .where(sql`${pluginRegistry.slug} = ${slug}`)
+        .run();
+    }
   }
 }
 
