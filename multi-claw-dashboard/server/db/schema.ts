@@ -137,6 +137,19 @@ export const settings = sqliteTable("settings", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const orchestrations = sqliteTable("orchestrations", {
+  id: text("id").primaryKey(),
+  prompt: text("prompt").notNull(),
+  mode: text("mode", { enum: ["parallel", "direct", "dashboard"] }).notNull(),
+  status: text("status", { enum: ["running", "completed", "failed"] }).notNull().default("running"),
+  agentIds: text("agent_ids"),
+  synthesis: text("synthesis"),
+  error: text("error"),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  completedAt: text("completed_at"),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
   id: text("id").primaryKey(),
   timestamp: text("timestamp").notNull().$defaultFn(() => new Date().toISOString()),

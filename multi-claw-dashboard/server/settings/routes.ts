@@ -27,6 +27,7 @@ const ALLOWED_SETTINGS_KEYS = new Set([
   "deepseek_api_key",
   "default_provider",
   "default_model",
+  "dashboard_profile",
 ]);
 
 router.put("/:key", requireRole("canManageUsers"), async (req, res) => {
