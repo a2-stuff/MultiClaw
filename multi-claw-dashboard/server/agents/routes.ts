@@ -309,6 +309,39 @@ router.delete("/:id/skills/:skillId", requireRole("canManageAgents"), async (req
 });
 
 router.get("/:id/plugins", async (req, res) => {
+  const agent = db.select().from(agents).where(eq(agents.id, req.params.id)).get();
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+  // Fetch live plugin list from the agent (source of truth)
+  try {
+    const agentUrl = resolveAgentUrl(agent);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(`${agentUrl}/api/plugins/`, {
+      headers: { "X-API-Key": agent.apiKey },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      const agentPluginList = await response.json() as Array<Record<string, unknown>>;
+      // Map agent response to AgentPlugin shape expected by frontend
+      const result = agentPluginList.map((p, i) => ({
+        id: String(p.slug || p.name || i),
+        pluginId: String(p.slug || p.name || i),
+        pluginName: String(p.name || "Unknown"),
+        pluginVersion: String(p.version || "1.0.0"),
+        enabled: p.enabled !== false,
+        status: (p.active || p.enabled) ? "installed" : "pending",
+        installedAt: String(p.installed_at || new Date().toISOString()),
+      }));
+      return res.json(result);
+    }
+  } catch {
+    // Agent unreachable — fall through to DB lookup
+  }
+
+  // Fallback: return plugins from legacy DB table if agent is offline
   const rows = db.select({
     id: agentPlugins.id, pluginId: agentPlugins.pluginId, pluginName: plugins.name,
     pluginVersion: plugins.version, enabled: agentPlugins.enabled,
