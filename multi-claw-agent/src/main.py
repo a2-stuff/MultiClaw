@@ -30,8 +30,34 @@ async def discover_dashboard_via_tailscale():
     return None
 
 
+async def _try_connect(agent_url: str) -> bool:
+    """Attempt a single connection to the dashboard. Returns True on success."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{settings.dashboard_url}/api/agents/connect",
+                json={
+                    "api_key": settings.api_key,
+                    "agent_name": settings.agent_name,
+                    "agent_url": agent_url,
+                },
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            settings.agent_id = data["agent_id"]
+            settings.agent_secret = data["agent_secret"]
+            logger.info(f"Connected to dashboard as '{settings.agent_name}' (id: {settings.agent_id})")
+            return True
+        else:
+            logger.info(f"Dashboard registration failed: {resp.status_code} {resp.text}")
+            return False
+    except Exception as e:
+        logger.info(f"Could not reach dashboard: {e}")
+        return False
+
+
 async def register_with_dashboard():
-    """Connect to dashboard on startup using API key."""
+    """Connect to dashboard on startup using API key, with retries."""
     if not settings.api_key:
         logger.info("No MULTICLAW_API_KEY set — skipping auto-register")
         return
@@ -55,25 +81,15 @@ async def register_with_dashboard():
         agent_url = settings.agent_url or f"http://localhost:{settings.port}"
 
     logger.info(f"Connecting to dashboard at {settings.dashboard_url}...")
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{settings.dashboard_url}/api/agents/connect",
-                json={
-                    "api_key": settings.api_key,
-                    "agent_name": settings.agent_name,
-                    "agent_url": agent_url,
-                },
-            )
-        if resp.status_code == 200:
-            data = resp.json()
-            settings.agent_id = data["agent_id"]
-            settings.agent_secret = data["agent_secret"]
-            logger.info(f"Connected to dashboard as '{settings.agent_name}' (id: {settings.agent_id})")
-        else:
-            logger.info(f"Dashboard registration failed: {resp.status_code} {resp.text}")
-    except Exception as e:
-        logger.info(f"Could not reach dashboard: {e}")
+    delays = [0, 2, 5, 10, 20]
+    for i, delay in enumerate(delays):
+        if delay:
+            await asyncio.sleep(delay)
+        if await _try_connect(agent_url):
+            return
+        if i < len(delays) - 1:
+            logger.info(f"Retrying connection in {delays[i + 1]}s...")
+    logger.warning("Could not connect to dashboard after retries — agent will run without auth until restarted")
 
 
 @asynccontextmanager
