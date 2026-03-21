@@ -13,3 +13,4 @@ multi-claw-agent/cron_runs/
 multi-claw-dashboard/uploads/
 multi-claw-agent/tests/
 multi-claw-dashboard/tests/
+tests/

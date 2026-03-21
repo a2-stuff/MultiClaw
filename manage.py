@@ -88,7 +88,7 @@ def _read_env(env_path: Path) -> dict[str, str]:
 
 def _dashboard_port() -> int:
     env = _read_env(DASHBOARD_DIR / ".env")
-    return int(env.get("PORT", "3000"))
+    return int(env.get("PORT", "3100"))
 
 
 def _agent_port() -> int:

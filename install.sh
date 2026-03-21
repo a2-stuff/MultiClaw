@@ -459,8 +459,8 @@ case $choice in
     echo ""
 
     # Port
-    read -p "Dashboard port [3000]: " DASH_PORT
-    DASH_PORT=${DASH_PORT:-3000}
+    read -p "Dashboard port [3100]: " DASH_PORT
+    DASH_PORT=${DASH_PORT:-3100}
 
     # JWT Secret
     echo ""

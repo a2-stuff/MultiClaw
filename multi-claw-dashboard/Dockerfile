@@ -24,6 +24,6 @@ COPY --from=builder /app/drizzle/ drizzle/
 COPY --from=builder /app/server/ server/
 COPY --from=builder /app/client/dist/ client/dist/
 
-EXPOSE 3000
+EXPOSE 3100
 
 CMD ["npx", "tsx", "server/index.ts"]

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     tailscale_enabled: bool = False
     tailscale_mode: str = "dual-stack"  # "tailscale-only" or "dual-stack"
     tailscale_tag: str = "tag:multiclaw-agent"
-    tailscale_dashboard_port: int = 3000  # Dashboard port for discovery
+    tailscale_dashboard_port: int = 3100  # Dashboard port for discovery
 
     # Dashboard-pushed config (set at runtime, not from env)
     _dashboard_anthropic_key: str = ""
