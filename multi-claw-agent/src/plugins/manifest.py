@@ -153,8 +153,9 @@ def parse_manifest(data: dict[str, Any]) -> PluginManifest:
 class ManifestRunner:
     """Executes manifest-declared post-install steps and health checks."""
 
-    def __init__(self, plugins_dir: Path):
+    def __init__(self, plugins_dir: Path, skills_dir: Path | None = None):
         self.plugins_dir = Path(plugins_dir)
+        self.skills_dir = Path(skills_dir) if skills_dir else self.plugins_dir.parent / "skills"
 
     # -- dependency / requirement checks ------------------------------------
 
@@ -316,7 +317,7 @@ class ManifestRunner:
             return StepResult(step_id=step.id, status="failed", error=str(e))
 
     def _copy_skills(self, step: PluginPostStep, repo_dir: Path) -> StepResult:
-        """Copy skills from plugin repo to agent skills directory."""
+        """Copy skills from plugin repo to the agent's isolated skills directory."""
         import shutil
 
         skills_src = repo_dir / "skills"
@@ -327,9 +328,8 @@ class ManifestRunner:
                 output="No skills/ directory in plugin repo",
             )
 
-        # Target: ~/.claude/skills/<plugin-slug>/
-        home = Path.home()
-        target = home / ".claude" / "skills"
+        # Target: agent's own skills directory (per-agent isolation)
+        target = self.skills_dir
         target.mkdir(parents=True, exist_ok=True)
 
         copied = 0

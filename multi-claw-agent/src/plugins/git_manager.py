@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class GitPluginManager:
-    def __init__(self, plugins_dir: Path):
+    def __init__(self, plugins_dir: Path, skills_dir: Path | None = None):
         self.plugins_dir = Path(plugins_dir)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
+        self.skills_dir = Path(skills_dir) if skills_dir else self.plugins_dir.parent / "skills"
 
     def check_git(self) -> bool:
         """Return True if git is available on PATH."""
@@ -89,7 +90,7 @@ class GitPluginManager:
 
         if manifest:
             parsed = parse_manifest(manifest)
-            runner = ManifestRunner(self.plugins_dir)
+            runner = ManifestRunner(self.plugins_dir, self.skills_dir)
             for step_res in runner.run_post_install_steps(
                 slug, parsed, env_vars=env_vars, plugin_dir=repo_dir
             ):
@@ -198,7 +199,7 @@ class GitPluginManager:
                 try:
                     parsed = parse_manifest(manifest_data)
                     if parsed.uninstall_steps:
-                        runner = ManifestRunner(self.plugins_dir)
+                        runner = ManifestRunner(self.plugins_dir, self.skills_dir)
                         repo_dir = plugin_dir / "repo"
                         work_dir = repo_dir if repo_dir.exists() else plugin_dir
                         for step_res in runner.run_uninstall_steps(slug, parsed, plugin_dir=work_dir):

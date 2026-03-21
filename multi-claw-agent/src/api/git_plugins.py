@@ -6,8 +6,8 @@ from src.plugins.git_manager import GitPluginManager
 from src.plugins.manifest import ManifestRunner, parse_manifest
 
 router = APIRouter(prefix="/api/plugins", dependencies=[Depends(require_api_key)])
-git_manager = GitPluginManager(settings.plugins_dir)
-manifest_runner = ManifestRunner(settings.plugins_dir)
+git_manager = GitPluginManager(settings.plugins_dir, settings.skills_dir)
+manifest_runner = ManifestRunner(settings.plugins_dir, settings.skills_dir)
 
 
 class InstallGitRequest(BaseModel):

@@ -114,7 +114,7 @@ async def uninstall_plugin(name: str):
                     if manifest_data:
                         parsed = parse_manifest(manifest_data)
                         if parsed.uninstall_steps:
-                            runner = ManifestRunner(Path(settings.plugins_dir))
+                            runner = ManifestRunner(Path(settings.plugins_dir), Path(settings.skills_dir))
                             for step_res in runner.run_uninstall_steps(slug, parsed, plugin_dir=plugin_dir):
                                 if step_res.status == "failed":
                                     import logging
