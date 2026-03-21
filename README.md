@@ -42,7 +42,7 @@
 [![WebSocket](https://img.shields.io/badge/WebSocket-010101.svg?logo=socketdotio&logoColor=white)](#)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-C5F74F.svg?logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
 
-> GitHub: [a2-stuff/MultiClaw](https://github.com/a2-stuff/MultiClaw) — Twitter: [@not_jarod](https://twitter.com/not_jarod)
+> GitHub: [a2-stuff/MultiClaw](https://github.com/a2-stuff/MultiClaw) — Twitter: [@not_jarod](https://twitter.com/not_jarod) & [@MultiClaw](https://twitter.com/MultiClaw)
 
 ---
 
