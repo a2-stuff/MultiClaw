@@ -13,7 +13,7 @@ function getAnthropicKey(): string | null {
 
 function getDefaultModel(): string {
   const row = db.select().from(settings).where(eq(settings.key, "default_model")).get();
-  return row?.value || "claude-sonnet-4-6-20250514";
+  return row?.value || "claude-sonnet-4-6";
 }
 
 function getClient(): Anthropic | null {
