@@ -34,8 +34,8 @@ export function AgentTasksTab({ agent }: { agent: Agent }) {
       await api.post(`/agents/${agent.id}/tasks`, { prompt: prompt.trim() });
       setPrompt("");
       fetchTasks();
-    } catch {
-      setError("Failed to send task");
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to send task");
     } finally {
       setSending(false);
     }

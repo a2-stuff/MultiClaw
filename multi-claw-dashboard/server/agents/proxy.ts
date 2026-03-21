@@ -18,6 +18,10 @@ router.post("/:agentId/tasks", async (req, res) => {
       headers: { "Content-Type": "application/json", "X-API-Key": agent.apiKey },
       body: JSON.stringify(req.body),
     });
+    if (!resp.ok) {
+      const errorText = await resp.text().catch(() => "");
+      return res.status(resp.status).json({ error: errorText || `Agent returned ${resp.status}` });
+    }
     const result = await resp.json();
     const id = uuid();
     db.insert(agentTasks).values({
@@ -26,7 +30,7 @@ router.post("/:agentId/tasks", async (req, res) => {
     res.json(result);
   } catch (err: any) {
     console.error("Agent proxy error:", err);
-    res.status(502).json({ error: "Failed to reach agent" });
+    res.status(502).json({ error: err.message || "Failed to reach agent" });
   }
 });
 

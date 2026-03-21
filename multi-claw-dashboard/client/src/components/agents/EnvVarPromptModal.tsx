@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { PluginManifest, PluginEnvVar, PluginDependency, AgentPluginStatus, RegistryPlugin } from "../../lib/types";
+import type { PluginManifest, PluginEnvVar, AgentPluginStatus, RegistryPlugin } from "../../lib/types";
 
 interface Props {
   open: boolean;

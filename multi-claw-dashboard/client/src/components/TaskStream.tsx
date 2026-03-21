@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSSE } from "../api/sse";
+import { silentApi } from "../api/client";
 
 const MAX_ORCHESTRATIONS = 50;
 
@@ -44,6 +45,49 @@ export function TaskStream() {
     Map<string, OrchestrationState>
   >(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load history from DB on mount
+  useEffect(() => {
+    const { get } = silentApi();
+    get("/tasks/")
+      .then((res) => {
+        const items = res.data as Array<{
+          id: string;
+          prompt: string;
+          mode: string;
+          steps?: Step[];
+          status: string;
+          synthesis?: string;
+        }>;
+        if (items.length > 0) {
+          setOrchestrations((prev) => {
+            const next = new Map(prev);
+            // Add historical items (oldest first so newest end up on top)
+            for (const item of [...items].reverse()) {
+              if (next.has(item.id)) continue; // SSE already has it
+              const state: OrchestrationState = {
+                prompt: item.prompt,
+                steps: item.steps || [],
+                status: item.status,
+                mode: item.mode as OrchestrationState["mode"],
+              };
+              if (item.mode === "dashboard" && item.synthesis) {
+                state.dashboardAnswer = item.synthesis;
+              } else if (item.synthesis) {
+                state.synthesis = item.synthesis;
+              }
+              next.set(item.id, state);
+            }
+            return next;
+          });
+        }
+      })
+      .catch(() => {}); // silent — history is best-effort
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setOrchestrations(new Map());
+  }, []);
 
   const handleSSE = useCallback((event: string, data: OrchestrationEvent) => {
     setOrchestrations((prev) => {
@@ -167,7 +211,15 @@ export function TaskStream() {
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h3 className="text-lg font-semibold mb-3">Live Tasks</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold">Live Tasks</h3>
+        <button
+          onClick={clearHistory}
+          className="text-xs text-gray-500 hover:text-gray-300 transition px-2 py-1 rounded hover:bg-gray-800"
+        >
+          Clear
+        </button>
+      </div>
       <div className="space-y-4 max-h-96 overflow-y-auto">
         {Array.from(orchestrations.entries())
           .reverse()
