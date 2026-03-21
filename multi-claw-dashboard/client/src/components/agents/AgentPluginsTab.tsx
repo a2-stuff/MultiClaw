@@ -22,8 +22,14 @@ export function AgentPluginsTab({ agent, canManage }: { agent: Agent; canManage:
   const fetchPlugins = useCallback(() => {
     setLoading(true);
     setError("");
-    api.get(`/agents/${agent.id}/plugins`)
-      .then((res) => setAgentPlugins(res.data))
+    Promise.all([
+      api.get(`/agents/${agent.id}/plugins`),
+      api.get("/plugin-registry"),
+    ])
+      .then(([pluginsRes, registryRes]) => {
+        setAgentPlugins(pluginsRes.data);
+        setRegistryPlugins(registryRes.data);
+      })
       .catch(() => setError("Failed to load plugins"))
       .finally(() => setLoading(false));
   }, [agent.id]);

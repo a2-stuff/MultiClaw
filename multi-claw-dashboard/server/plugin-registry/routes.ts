@@ -201,6 +201,9 @@ router.post("/:id/deploy", async (req, res) => {
               "Content-Type": "application/json",
               "X-API-Key": agent.apiKey,
             },
+            body: JSON.stringify({
+              manifest: manifest || undefined,
+            }),
             signal: controller.signal,
           });
           clearTimeout(timeout);

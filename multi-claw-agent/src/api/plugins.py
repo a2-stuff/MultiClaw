@@ -34,7 +34,7 @@ async def install_plugin(metadata: str = Form(...), files: list[UploadFile] = Fi
     return {"installed": True, "activated": True, "plugin": result}
 
 @router.post("/{name}/activate")
-async def activate_plugin(name: str):
+async def activate_plugin(name: str, body: dict | None = None):
     import shutil
     from pathlib import Path
 
@@ -52,6 +52,14 @@ async def activate_plugin(name: str):
             shutil.copytree(source_dir, local_dir)
         else:
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+    # Store manifest in plugin.json if provided (for health checks)
+    if body and body.get("manifest"):
+        plugin_json = local_dir / "plugin.json"
+        if plugin_json.exists():
+            meta = json.loads(plugin_json.read_text())
+            meta["manifest"] = body["manifest"]
+            plugin_json.write_text(json.dumps(meta, indent=2))
 
     try:
         plugin_loader.load_plugin(name)

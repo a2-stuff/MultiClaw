@@ -92,7 +92,12 @@ async def get_plugin_skills(slug: str):
 
 @router.get("/{slug}/health")
 async def plugin_health_check(slug: str):
+    # Check git plugins first, then built-in plugins
     meta = git_manager.get_metadata(slug)
+    if not meta:
+        # Try built-in plugin manager
+        from src.api.plugins import plugin_manager
+        meta = plugin_manager.get_plugin(slug)
     if not meta:
         raise HTTPException(status_code=404, detail=f"Plugin '{slug}' not found")
 
