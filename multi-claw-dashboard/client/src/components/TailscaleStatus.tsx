@@ -6,7 +6,8 @@ export function TailscaleStatus() {
     queryKey: ["tailscale-status"],
     queryFn: () => silentApi().get("/tailscale/status").then((r) => r.data),
     retry: false,
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? false : 30000,
   });
 
   if (isError || !data) return null;
