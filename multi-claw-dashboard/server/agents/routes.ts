@@ -325,16 +325,18 @@ router.get("/:id/plugins", async (req, res) => {
 
     if (response.ok) {
       const agentPluginList = await response.json() as Array<Record<string, unknown>>;
-      // Map agent response to AgentPlugin shape expected by frontend
-      const result = agentPluginList.map((p, i) => ({
-        id: String(p.slug || p.name || i),
-        pluginId: String(p.slug || p.name || i),
-        pluginName: String(p.name || "Unknown"),
-        pluginVersion: String(p.version || "1.0.0"),
-        enabled: p.enabled !== false,
-        status: (p.active || p.enabled) ? "installed" : "pending",
-        installedAt: String(p.installed_at || new Date().toISOString()),
-      }));
+      // Filter to only active/enabled plugins and map to AgentPlugin shape
+      const result = agentPluginList
+        .filter((p) => p.active !== false)
+        .map((p, i) => ({
+          id: String(p.slug || p.name || i),
+          pluginId: String(p.slug || p.name || i),
+          pluginName: String(p.name || "Unknown"),
+          pluginVersion: String(p.version || "1.0.0"),
+          enabled: p.enabled !== false,
+          status: "installed" as const,
+          installedAt: String(p.installed_at || new Date().toISOString()),
+        }));
       return res.json(result);
     }
   } catch {
