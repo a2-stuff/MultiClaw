@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { api } from "../../api/client";
 import type { Agent } from "../../lib/types";
 
@@ -28,7 +28,7 @@ export function AgentLogsTab({ agent }: { agent: Agent }) {
 
   const fetchLogs = async () => {
     try {
-      const params = new URLSearchParams({ limit: "500" });
+      const params = new URLSearchParams({ limit: "100" });
       if (levelFilter) params.set("level", levelFilter);
       const res = await api.get(`/agents/${agent.id}/logs?${params}`);
       setLogs(res.data);
@@ -43,13 +43,16 @@ export function AgentLogsTab({ agent }: { agent: Agent }) {
   useEffect(() => {
     fetchLogs();
     if (!autoRefresh) return;
-    const interval = setInterval(fetchLogs, 5000);
+    const interval = setInterval(fetchLogs, 15000);
     return () => clearInterval(interval);
   }, [agent.id, autoRefresh, levelFilter]);
 
-  const filtered = filter
-    ? logs.filter((l) => l.message.toLowerCase().includes(filter.toLowerCase()))
-    : logs;
+  const filtered = useMemo(
+    () => filter
+      ? logs.filter((l) => l.message.toLowerCase().includes(filter.toLowerCase()))
+      : logs,
+    [logs, filter]
+  );
 
   const formatTime = (ts: number) => {
     const d = new Date(ts * 1000);

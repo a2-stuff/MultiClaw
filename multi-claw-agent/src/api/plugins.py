@@ -95,7 +95,7 @@ async def uninstall_plugin(name: str):
             if git_manager.uninstall(slug):
                 return {"uninstalled": True}
 
-    # Try built-in plugin uninstall — delete from plugins folder
+    # Try built-in plugin uninstall — run manifest uninstall steps then delete folder
     for slug in candidates:
         # Unload from memory
         if slug in plugin_loader.active_plugins:
@@ -103,6 +103,29 @@ async def uninstall_plugin(name: str):
 
         plugin_dir = Path(settings.plugins_dir) / slug
         if plugin_dir.exists():
+            # Run manifest uninstall steps if the plugin.json has a manifest
+            plugin_json = plugin_dir / "plugin.json"
+            if plugin_json.exists():
+                try:
+                    import json as _json
+                    from src.plugins.manifest import ManifestRunner, parse_manifest
+                    meta = _json.loads(plugin_json.read_text())
+                    manifest_data = meta.get("manifest")
+                    if manifest_data:
+                        parsed = parse_manifest(manifest_data)
+                        if parsed.uninstall_steps:
+                            runner = ManifestRunner(Path(settings.plugins_dir))
+                            for step_res in runner.run_uninstall_steps(slug, parsed, plugin_dir=plugin_dir):
+                                if step_res.status == "failed":
+                                    import logging
+                                    logging.getLogger(__name__).warning(
+                                        "Uninstall step '%s' failed for %s: %s",
+                                        step_res.step_id, slug, step_res.error,
+                                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning("Manifest uninstall failed for %s: %s", slug, e)
+
             shutil.rmtree(plugin_dir)
             return {"uninstalled": True}
 

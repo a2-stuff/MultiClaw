@@ -2,6 +2,40 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.3.0] - 2026-03-21
+
+### Added
+- **Plugin Uninstall Steps** — Manifests now support an `uninstallSteps` field alongside `postInstallSteps`. When a plugin is removed, the agent runs declared cleanup commands before deleting the plugin folder — unregistering daemons, purging packages, removing data directories, and cleaning up installed CLIs.
+- **Uninstall Coverage for All Plugins** — Every plugin in the registry now has a complete uninstall procedure:
+  - **Docker** — stops and disables the Docker daemon, purges all `docker-ce` packages via apt, removes `/var/lib/docker`, `/var/lib/containerd`, and `/etc/docker`
+  - **Portainer** — removes the `portainer` container, deletes the `portainer_data` volume, and removes the image
+  - **Tailscale** — disconnects from the Tailscale network (`tailscale down`), purges the `tailscale` package, removes `/var/lib/tailscale` and `/etc/tailscale`
+  - **Browser Control** — removes Chromium browser files from `~/.cache/ms-playwright/`, uninstalls the Playwright Python package
+  - **Nmap Unleashed** — runs `pipx uninstall nmapUnleashed` to remove the `nu` CLI
+  - **Bankr Agent** — runs `npm uninstall -g @bankr/cli`
+  - **AgentPay SDK** — runs the repo's `uninstall:cli-launcher` script or falls back to `npm uninstall -g agentpay`
+  - **AgentPay Skill Pack** — removes all skills copied to `~/.claude/skills/` during installation
+  - **Superpowers** — removes all skills copied to `~/.claude/skills/` during installation
+- **Per-Agent Environment Isolation** — Each spawned agent instance now uses its own `.env` file under `~/.multiclaw/agents/<name>/.env`. The systemd service `EnvironmentFile` directive points to the per-agent file, so `MULTICLAW_PLUGINS_DIR` and `MULTICLAW_SKILLS_DIR` are scoped per agent without any global overrides.
+- **Agent Connection Retry** — On startup, the agent retries its registration handshake with the dashboard using exponential backoff (0 / 2 / 5 / 10 / 20 seconds). If the dashboard is temporarily unavailable (e.g., restarting), the agent reconnects automatically instead of failing silently.
+- **Built-in Plugin Source Directories** — `hello-plugin`, `docker`, and `portainer` now have source directories in the agent source tree (`multi-claw-agent/plugins/`), enabling the activate endpoint to copy them into per-agent plugin directories correctly.
+- **Agent-Side Delete Error Surfacing** — When a plugin deletion request to an agent returns an error, the dashboard now captures and returns the agent's error message in the response. The UI shows a warning when the plugin was removed from the dashboard registry but the agent reported a problem.
+
+### Fixed
+- Git plugins (Superpowers, Nmap Unleashed, etc.) now show as **active** based on the `enabled` flag in `plugin.json` rather than requiring a Python class to be loaded in memory — they were incorrectly showing as inactive after each agent restart
+- Plugin folders in the per-agent `plugins/` directory are now fully deleted when a plugin is removed — previously the folder persisted because the agent was reading from the wrong `plugins_dir` path
+- Manifest uninstall steps for built-in plugins (non-git) are now executed on deletion — the built-in delete path previously skipped manifest cleanup and jumped directly to `shutil.rmtree`
+
+### Changed
+- `PluginManifest` dataclass gains `uninstall_steps: list[PluginPostStep]` field
+- `parse_manifest()` reads `uninstallSteps` array from manifest JSON
+- `ManifestRunner` gains `run_uninstall_steps()` method, mirroring `run_post_install_steps()`
+- `GitPluginManager.uninstall()` runs manifest uninstall steps (if declared) before deleting the plugin directory; falls back to `uninstall.sh` only when no manifest steps are defined
+- `uninstall_plugin` API endpoint reads the stored manifest from `plugin.json` and runs `uninstall_steps` before calling `shutil.rmtree`
+- `uninstall.sh` fallback now inherits the real `HOME` and `PATH` from the process environment (was using a hardcoded restricted env with `HOME` set to the repo directory)
+
+---
+
 ## [1.2.0] - 2026-03-21
 
 ### Added
@@ -150,6 +184,7 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.3.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.3.0
 [1.2.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.2.0
 [1.1.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.1.0
 [1.0.1]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.0.1

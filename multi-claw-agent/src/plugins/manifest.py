@@ -62,6 +62,7 @@ class PluginManifest:
     dependencies: list[PluginDependency] = field(default_factory=list)
     system_requirements: list[str] = field(default_factory=list)
     post_install_steps: list[PluginPostStep] = field(default_factory=list)
+    uninstall_steps: list[PluginPostStep] = field(default_factory=list)
     health_checks: list[PluginHealthCheck] = field(default_factory=list)
 
 
@@ -114,6 +115,16 @@ def parse_manifest(data: dict[str, Any]) -> PluginManifest:
         )
         for s in data.get("postInstallSteps", [])
     ]
+    uninstall_steps = [
+        PluginPostStep(
+            id=s["id"],
+            label=s["label"],
+            type=s["type"],
+            command=s.get("command"),
+            timeout=s.get("timeout", 300),
+        )
+        for s in data.get("uninstallSteps", [])
+    ]
     health_checks = [
         PluginHealthCheck(
             type=h["type"],
@@ -130,6 +141,7 @@ def parse_manifest(data: dict[str, Any]) -> PluginManifest:
         dependencies=dependencies,
         system_requirements=data.get("systemRequirements", []),
         post_install_steps=post_install_steps,
+        uninstall_steps=uninstall_steps,
         health_checks=health_checks,
     )
 
@@ -334,6 +346,30 @@ class ManifestRunner:
             status="success",
             output=f"Copied {copied} skill(s) to {target}",
         )
+
+    # -- uninstall steps ----------------------------------------------------
+
+    def run_uninstall_steps(
+        self,
+        slug: str,
+        manifest: PluginManifest,
+        plugin_dir: Path | None = None,
+    ) -> Generator[StepResult, None, None]:
+        """
+        Execute each uninstall step sequentially, yielding a StepResult after each.
+        Uses real HOME so tools like pipx are accessible at their installed paths.
+        """
+        work_dir = plugin_dir or (self.plugins_dir / slug / "repo")
+        run_env = self._build_env(None, work_dir)
+
+        for step in manifest.uninstall_steps:
+            logger.info("Plugin %s: running uninstall step '%s' (%s)", slug, step.label, step.id)
+            result = self._execute_step(step, run_env, work_dir)
+            yield result
+            if result.status == "failed":
+                logger.warning(
+                    "Plugin %s: uninstall step '%s' failed: %s", slug, step.id, result.error
+                )
 
     # -- health checks ------------------------------------------------------
 

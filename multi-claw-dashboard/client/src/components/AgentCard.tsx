@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { api } from "../api/client";
 import type { Agent } from "../lib/types";
 
@@ -6,7 +6,7 @@ const statusColors = {
   online: "bg-green-500", offline: "bg-gray-500", busy: "bg-yellow-500", error: "bg-red-500",
 };
 
-export function AgentCard({ agent, onClick }: { agent: Agent; onClick: () => void }) {
+export const AgentCard = memo(function AgentCard({ agent, onClick }: { agent: Agent; onClick: () => void }) {
   const [updating, setUpdating] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
 
@@ -68,4 +68,4 @@ export function AgentCard({ agent, onClick }: { agent: Agent; onClick: () => voi
       </div>
     </div>
   );
-}
+});

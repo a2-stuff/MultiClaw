@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { DecoratorNode, type LexicalNode, type NodeKey, type SerializedLexicalNode } from "lexical";
 
 export interface SerializedMentionNode extends SerializedLexicalNode {
@@ -5,7 +6,7 @@ export interface SerializedMentionNode extends SerializedLexicalNode {
   agentName: string;
 }
 
-export class MentionNode extends DecoratorNode<JSX.Element> {
+export class MentionNode extends DecoratorNode<ReactNode> {
   __agentId: string;
   __agentName: string;
 
@@ -37,7 +38,7 @@ export class MentionNode extends DecoratorNode<JSX.Element> {
     return false;
   }
 
-  decorate(): JSX.Element {
+  decorate(): ReactNode {
     return <span />;
   }
 

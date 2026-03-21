@@ -193,7 +193,7 @@ export function Workflows() {
       setCurrentRun({ id: runId, workflowId, status: "running", input: runInput || null, output: null, startedAt: new Date().toISOString(), completedAt: null, createdBy: null, steps: [] });
       // Start polling
       if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => pollRun(runId), 2000);
+      pollRef.current = setInterval(() => pollRun(runId), 5000);
       pollRun(runId);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to start run");

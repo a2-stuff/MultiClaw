@@ -184,37 +184,60 @@ class GitPluginManager:
 
     def uninstall(self, slug: str) -> bool:
         """Remove the plugin directory and clean up containers. Returns True on success."""
+        from src.plugins.manifest import ManifestRunner, parse_manifest
+
         plugin_dir = self.plugins_dir / slug
         if not plugin_dir.exists():
             return False
 
-        # Clean up Docker container/image if applicable
         meta = self.get_metadata(slug)
         if meta:
+            # Run manifest uninstall steps if defined
+            manifest_data = meta.get("manifest")
+            if manifest_data:
+                try:
+                    parsed = parse_manifest(manifest_data)
+                    if parsed.uninstall_steps:
+                        runner = ManifestRunner(self.plugins_dir)
+                        repo_dir = plugin_dir / "repo"
+                        work_dir = repo_dir if repo_dir.exists() else plugin_dir
+                        for step_res in runner.run_uninstall_steps(slug, parsed, plugin_dir=work_dir):
+                            if step_res.status == "failed":
+                                logger.warning(
+                                    "Uninstall step '%s' failed for %s: %s",
+                                    step_res.step_id, slug, step_res.error,
+                                )
+                except Exception as e:
+                    logger.warning("Manifest uninstall failed for %s: %s", slug, e)
+
+            # Clean up Docker container/image if applicable
             container_name = meta.get("container_name")
             if container_name:
                 self._docker_cleanup(container_name, slug)
 
-            # Run uninstall.sh if present
-            repo_dir = plugin_dir / "repo"
-            uninstall_sh = repo_dir / "uninstall.sh"
-            if uninstall_sh.exists():
-                try:
-                    safe_env = {
-                        "PATH": "/usr/local/bin:/usr/bin:/bin",
-                        "HOME": str(repo_dir),
-                        "LANG": "C.UTF-8",
-                    }
-                    subprocess.run(
-                        ["bash", str(uninstall_sh)],
-                        cwd=str(repo_dir),
-                        capture_output=True,
-                        text=True,
-                        timeout=300,
-                        env=safe_env,
-                    )
-                except Exception as e:
-                    logger.warning("uninstall.sh failed for %s: %s", slug, e)
+            # Run uninstall.sh if present (legacy fallback, no manifest uninstall steps)
+            manifest_data = meta.get("manifest")
+            if not (manifest_data and parse_manifest(manifest_data).uninstall_steps):
+                repo_dir = plugin_dir / "repo"
+                uninstall_sh = repo_dir / "uninstall.sh"
+                if uninstall_sh.exists():
+                    try:
+                        import os as _os
+                        safe_env = {
+                            "PATH": _os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
+                            "HOME": _os.environ.get("HOME", str(Path.home())),
+                            "LANG": "C.UTF-8",
+                        }
+                        subprocess.run(
+                            ["bash", str(uninstall_sh)],
+                            cwd=str(repo_dir),
+                            capture_output=True,
+                            text=True,
+                            timeout=300,
+                            env=safe_env,
+                        )
+                    except Exception as e:
+                        logger.warning("uninstall.sh failed for %s: %s", slug, e)
 
         shutil.rmtree(plugin_dir)
         return True

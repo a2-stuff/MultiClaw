@@ -7,10 +7,10 @@
     "enabled": true,
     "created_at": "2026-03-19T17:44:30.104751+00:00",
     "updated_at": null,
-    "last_run_at": "2026-03-20T17:50:00.000948+00:00",
+    "last_run_at": "2026-03-21T23:20:24.053001+00:00",
     "last_exit_code": 0,
     "last_output": "api\n",
-    "next_run_at": "2026-03-20T18:00:00+00:00"
+    "next_run_at": "2026-03-21T23:30:00+00:00"
   },
   {
     "id": "13573a6c-7533-490a-8c93-6cbb2cdd37d7",
@@ -20,10 +20,10 @@
     "enabled": true,
     "created_at": "2026-03-19T17:44:30.114328+00:00",
     "updated_at": null,
-    "last_run_at": "2026-03-20T14:00:00.000854+00:00",
+    "last_run_at": "2026-03-21T23:00:00.002482+00:00",
     "last_exit_code": 0,
     "last_output": "get\n",
-    "next_run_at": "2026-03-20T15:00:00+00:00"
+    "next_run_at": "2026-03-22T00:00:00+00:00"
   },
   {
     "id": "3e24e1e0-cd0f-4fa4-9db6-4a029c062bb0",
@@ -33,10 +33,10 @@
     "enabled": true,
     "created_at": "2026-03-19T17:44:30.121496+00:00",
     "updated_at": "2026-03-19T17:44:30.125221+00:00",
-    "last_run_at": "2026-03-20T14:00:00.002080+00:00",
+    "last_run_at": "2026-03-21T23:00:00.010282+00:00",
     "last_exit_code": 0,
     "last_output": "new\n",
-    "next_run_at": "2026-03-20T15:00:00+00:00"
+    "next_run_at": "2026-03-22T00:00:00+00:00"
   },
   {
     "id": "e60bb3e9-7878-46fa-b0a8-65af54efb714",
@@ -46,9 +46,113 @@
     "enabled": true,
     "created_at": "2026-03-19T17:44:30.132936+00:00",
     "updated_at": null,
-    "last_run_at": "2026-03-20T14:00:00.004145+00:00",
+    "last_run_at": "2026-03-21T23:00:00.012688+00:00",
     "last_exit_code": 0,
     "last_output": "trigger\n",
-    "next_run_at": "2026-03-20T15:00:00+00:00"
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "3623bcdd-18ac-47fe-b1d5-d403b9818c38",
+    "name": "API Test",
+    "command": "echo api",
+    "schedule": "*/10 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:37:21.386581+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:20:24.050426+00:00",
+    "last_exit_code": 0,
+    "last_output": "api\n",
+    "next_run_at": "2026-03-21T23:30:00+00:00"
+  },
+  {
+    "id": "3a155120-f1ec-4830-8bfd-1e531573df09",
+    "name": "Get Test",
+    "command": "echo get",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:37:21.395941+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:00:00.007190+00:00",
+    "last_exit_code": 0,
+    "last_output": "get\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "f07f370b-aca8-4042-b4c8-4eb038cb0591",
+    "name": "Updated",
+    "command": "echo new",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:37:21.402423+00:00",
+    "updated_at": "2026-03-21T15:37:21.405905+00:00",
+    "last_run_at": "2026-03-21T23:00:00.016739+00:00",
+    "last_exit_code": 0,
+    "last_output": "new\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "3a7a2c86-9667-4b36-981a-c5b80645e216",
+    "name": "Trigger Test",
+    "command": "echo trigger",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:37:21.413431+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:00:00.008232+00:00",
+    "last_exit_code": 0,
+    "last_output": "trigger\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "379f799a-28f4-440c-a834-7ce496ee920f",
+    "name": "API Test",
+    "command": "echo api",
+    "schedule": "*/10 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:42:44.897177+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:20:24.051445+00:00",
+    "last_exit_code": 0,
+    "last_output": "api\n",
+    "next_run_at": "2026-03-21T23:30:00+00:00"
+  },
+  {
+    "id": "cfa1de81-7044-450f-8cbb-d9c0693cac84",
+    "name": "Get Test",
+    "command": "echo get",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:42:44.905908+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:00:00.011236+00:00",
+    "last_exit_code": 0,
+    "last_output": "get\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "34e9a033-5aad-440b-bfcf-a0fb7e38a508",
+    "name": "Updated",
+    "command": "echo new",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:42:44.911856+00:00",
+    "updated_at": "2026-03-21T15:42:44.914888+00:00",
+    "last_run_at": "2026-03-21T23:00:00.003190+00:00",
+    "last_exit_code": 0,
+    "last_output": "new\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
+  },
+  {
+    "id": "ff4e016d-a247-4ca0-b3f5-736cf252f08a",
+    "name": "Trigger Test",
+    "command": "echo trigger",
+    "schedule": "0 * * * *",
+    "enabled": true,
+    "created_at": "2026-03-21T15:42:44.921559+00:00",
+    "updated_at": null,
+    "last_run_at": "2026-03-21T23:00:00.018562+00:00",
+    "last_exit_code": 0,
+    "last_output": "trigger\n",
+    "next_run_at": "2026-03-22T00:00:00+00:00"
   }
 ]

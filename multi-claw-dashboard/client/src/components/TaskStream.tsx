@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSSE } from "../api/sse";
+
+const MAX_ORCHESTRATIONS = 50;
 
 interface Step {
   agentId: string;
@@ -43,7 +45,7 @@ export function TaskStream() {
   >(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const handleSSE = (event: string, data: OrchestrationEvent) => {
+  const handleSSE = useCallback((event: string, data: OrchestrationEvent) => {
     setOrchestrations((prev) => {
       const next = new Map(prev);
 
@@ -137,15 +139,29 @@ export function TaskStream() {
         }
       }
 
+      // Evict oldest completed orchestrations when exceeding limit
+      if (next.size > MAX_ORCHESTRATIONS) {
+        for (const [key, val] of next) {
+          if (next.size <= MAX_ORCHESTRATIONS) break;
+          if (val.status === "completed" || val.status === "failed") {
+            next.delete(key);
+          }
+        }
+      }
+
       return next;
     });
-  };
+  }, []);
 
   useSSE("/api/sse", handleSSE);
 
+  const prevSizeRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [orchestrations]);
+    if (orchestrations.size > prevSizeRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevSizeRef.current = orchestrations.size;
+  }, [orchestrations.size]);
 
   if (orchestrations.size === 0) return null;
 

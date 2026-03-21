@@ -11,6 +11,11 @@ export function useSSE(url: string, onEvent: (event: string, data: any) => void)
 
     function connect() {
       if (closed) return;
+      // Close previous connection if reconnecting
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
       const token = localStorage.getItem("token");
       const fullUrl = `${url}${url.includes("?") ? "&" : "?"}token=${token}`;
       const es = new EventSource(fullUrl);
