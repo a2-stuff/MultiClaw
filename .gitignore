@@ -11,4 +11,5 @@ docs/*
 .superpowers/
 multi-claw-agent/cron_runs/
 multi-claw-dashboard/uploads/
-tests/
+multi-claw-agent/tests/
+multi-claw-dashboard/tests/
