@@ -484,7 +484,10 @@ async function pollTaskCompletion(
         if (data.status === "failed") throw new Error(data.error || "Task failed");
       }
     } catch (err: any) {
-      if (err.message.includes("Task failed")) throw err;
+      // Re-throw task errors from the agent; only swallow transient network failures
+      if (err.message && !err.message.includes("fetch failed") && !err.message.includes("ECONNREFUSED")) {
+        throw err;
+      }
     }
     await new Promise((r) => setTimeout(r, interval));
     waited += interval;
