@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { agents } from "../db/schema.js";
@@ -23,7 +24,6 @@ export class AgentMonitor {
   }
 
   private autoStartSpawnedAgents() {
-    const { execSync } = require("child_process");
     const allAgents = db.select().from(agents).all();
     for (const agent of allAgents) {
       if (!agent.spawnedLocally || !agent.spawnDir || agent.containerId) continue;
