@@ -87,21 +87,25 @@ export function TaskStream() {
       }
 
       if (event === "dashboard_answer_start") {
-        const orch = next.get(data.id);
-        if (orch) {
-          next.set(data.id, { ...orch, dashboardAnswerPending: true });
-        }
+        // Create the entry — no orchestration_start is fired for dashboard queries
+        next.set(data.id, {
+          prompt: data.prompt || "",
+          steps: [],
+          status: "running",
+          mode: "dashboard",
+          dashboardAnswerPending: true,
+        });
       }
 
       if (event === "dashboard_answer") {
         const orch = next.get(data.id);
-        if (orch) {
-          next.set(data.id, {
-            ...orch,
-            dashboardAnswer: data.answer,
-            dashboardAnswerPending: false,
-          });
-        }
+        const base = orch || { prompt: "", steps: [], mode: "dashboard" };
+        next.set(data.id, {
+          ...base,
+          status: data.status === "failed" ? "failed" : "completed",
+          dashboardAnswer: data.answer,
+          dashboardAnswerPending: false,
+        });
       }
 
       if (event === "synthesis_start") {
