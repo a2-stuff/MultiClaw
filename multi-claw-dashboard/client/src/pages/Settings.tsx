@@ -21,6 +21,10 @@ export function Settings() {
   const [corsError, setCorsError] = useState("");
   const [corsLoading, setCorsLoading] = useState(false);
   const [dockerStatus, setDockerStatus] = useState<any>(null);
+  const [dashboardProfile, setDashboardProfile] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [livePreview, setLivePreview] = useState("");
 
   useEffect(() => {
     api.get("/cors-origins").then((res) => setCorsOrigins(res.data)).catch(() => {});
@@ -66,6 +70,31 @@ export function Settings() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.get("/settings").then((res) => {
+      const profileEntry = res.data.find((s: any) => s.key === "dashboard_profile");
+      if (profileEntry?.hasValue) {
+        setDashboardProfile(profileEntry.value);
+      }
+    }).catch(() => {});
+    api.get("/settings/dashboard-preview").then((res) => {
+      setLivePreview(res.data.preview);
+    }).catch(() => {});
+  }, []);
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    try {
+      await api.put("/settings/dashboard_profile", { value: dashboardProfile });
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 3000);
+    } catch (err: any) {
+      setMessage({ key: "dashboard_profile", text: err.response?.data?.error || "Failed to save" });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const saveKey = async (providerKey: string) => {
     const value = keys[providerKey];
@@ -183,6 +212,41 @@ export function Settings() {
             );
           })}
         </div>
+      </div>
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-2">Dashboard Profile</h3>
+        <p className="text-gray-400 text-sm mb-4">
+          Custom instructions for the dashboard's AI personality. Used when answering direct queries (no agents tagged) and when synthesizing parallel agent results.
+        </p>
+        <textarea
+          value={dashboardProfile}
+          onChange={(e) => { setDashboardProfile(e.target.value); setProfileSaved(false); }}
+          placeholder="You are the MultiClaw administrator. Be concise. Prioritize security alerts..."
+          rows={5}
+          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none mb-3 font-mono text-sm"
+        />
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-gray-500 text-xs">{dashboardProfile.length} characters</span>
+          <button
+            onClick={saveProfile}
+            disabled={profileSaving}
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg text-white text-sm transition"
+          >
+            {profileSaving ? "Saving..." : profileSaved ? "Saved!" : "Save Profile"}
+          </button>
+        </div>
+
+        {livePreview && (
+          <details className="mt-2">
+            <summary className="text-gray-400 text-xs cursor-pointer hover:text-gray-300">
+              Auto-injected live context (read-only preview)
+            </summary>
+            <pre className="mt-2 p-3 bg-gray-800 rounded-lg text-gray-400 text-xs overflow-x-auto whitespace-pre-wrap">
+              {livePreview}
+            </pre>
+          </details>
+        )}
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">

@@ -71,4 +71,14 @@ router.delete("/:key", requireRole("canManageUsers"), async (req, res) => {
   res.json({ success: true });
 });
 
+router.get("/dashboard-preview", requireRole("canManageUsers"), async (_req, res) => {
+  try {
+    const { getLiveContextPreview } = await import("../dashboard/profile.js");
+    const preview = await getLiveContextPreview();
+    res.json({ preview });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to generate preview" });
+  }
+});
+
 export { router as settingsRouter };
