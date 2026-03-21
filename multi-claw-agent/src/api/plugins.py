@@ -41,8 +41,8 @@ async def activate_plugin(name: str):
     # If plugin not in local plugins dir, copy from built-in source
     local_dir = Path(settings.plugins_dir) / name
     if not local_dir.exists():
-        # Built-in plugins live in the agent source tree
-        source_plugins = Path(__file__).parent.parent.parent / "plugins"
+        # Built-in plugins live in the agent source tree (resolve symlinks)
+        source_plugins = Path(__file__).resolve().parent.parent.parent / "plugins"
         # Try exact name match, then with underscores (e.g. hello-plugin vs hello_plugin)
         source_dir = source_plugins / name
         if not source_dir.exists():
