@@ -16,8 +16,6 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@lexical/plain-text": "^0.17.1",
-    "@lexical/react": "^0.17.1",
     "@xyflow/react": "^12.10.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
@@ -30,7 +28,6 @@
     "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "lexical": "^0.17.1",
     "multer": "^2.1.1",
     "uuid": "^13.0.0",
     "ws": "^8.19.0",
