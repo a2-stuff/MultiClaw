@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 import uuid
@@ -110,8 +111,8 @@ class CronManager:
             )
         return True
 
-    def _run_cron(self, cron: dict) -> None:
-        result = self.executor.execute(cron["id"], cron["command"])
+    async def _run_cron(self, cron: dict) -> None:
+        result = await asyncio.to_thread(self.executor.execute, cron["id"], cron["command"])
         with self._lock:
             live = next((c for c in self._crons if c["id"] == cron["id"]), None)
             if live:

@@ -9,6 +9,7 @@ export function Plugins() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -56,6 +57,14 @@ export function Plugins() {
         </button>
       </div>
 
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search plugins..."
+        className="w-full mb-4 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm"
+      />
+
       {registryPlugins.length === 0 ? (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
           <p className="text-gray-400 mb-2">No plugins in the registry yet.</p>
@@ -63,18 +72,31 @@ export function Plugins() {
             Add a plugin to deploy it across your agents.
           </p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {registryPlugins.map((plugin) => (
-            <RegistryPluginCard
-              key={plugin.id}
-              plugin={plugin}
-              agents={agents}
-              onRefresh={refreshRegistry}
-            />
-          ))}
-        </div>
-      )}
+      ) : (() => {
+        const q = search.toLowerCase();
+        const filtered = q
+          ? registryPlugins.filter((p) =>
+              p.name.toLowerCase().includes(q) ||
+              p.slug.toLowerCase().includes(q) ||
+              (p.description ?? "").toLowerCase().includes(q) ||
+              (p.author ?? "").toLowerCase().includes(q)
+            )
+          : registryPlugins;
+        return filtered.length === 0 ? (
+          <p className="text-gray-500 text-sm text-center py-8">No plugins match "{search}"</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((plugin) => (
+              <RegistryPluginCard
+                key={plugin.id}
+                plugin={plugin}
+                agents={agents}
+                onRefresh={refreshRegistry}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       <AddPluginModal
         open={addModalOpen}
