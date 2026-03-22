@@ -3,11 +3,12 @@ import { v4 as uuid } from "uuid";
 import crypto from "crypto";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { agents, agentSkills, agentPlugins, agentRegistryPlugins, agentTasks, skills, plugins, pluginRegistry, apiKeys } from "../db/schema.js";
+import { agents, agentSkills, agentPlugins, agentRegistryPlugins, agentTasks, skills, plugins, pluginRegistry, apiKeys, settings } from "../db/schema.js";
 import { requireAuth, requireRole } from "../auth/middleware.js";
 import { resolveAgentUrl } from "../tailscale/helpers.js";
 import { validateAgentUrl } from "./url-validation.js";
 import { spawnLocalAgent, stopSpawnedAgent, startSpawnedAgent } from "./spawn.js";
+import { optimizeIdentity } from "./optimize.js";
 import { spawnDockerAgent, stopDockerAgent, startDockerAgent, deleteDockerAgent, getContainerLogs, isDockerAvailable } from "./docker-spawn.js";
 import { auditFromReq } from "../audit/logger.js";
 
@@ -224,6 +225,34 @@ router.patch("/:id/identity", requireRole("canManageAgents"), async (req, res) =
     });
   } catch {}
   res.json({ success: true });
+});
+
+router.post("/:id/optimize-identity", requireRole("canManageAgents"), async (req, res) => {
+  try {
+    const { identity, intensity } = req.body;
+    if (!identity || typeof identity !== "string" || identity.trim().length === 0) {
+      return res.status(400).json({ error: "identity text is required" });
+    }
+    if (identity.length > 50000) {
+      return res.status(400).json({ error: "identity must be 50,000 characters or fewer" });
+    }
+    const validIntensities = ["light", "medium", "heavy"];
+    if (!intensity || !validIntensities.includes(intensity)) {
+      return res.status(400).json({ error: "intensity must be one of: light, medium, heavy" });
+    }
+
+    // Read global Anthropic API key from settings table
+    const row = db.select().from(settings).where(eq(settings.key, "anthropic_api_key")).get();
+    if (!row?.value) {
+      return res.status(422).json({ error: "No Anthropic API key configured in dashboard settings" });
+    }
+
+    const optimized = await optimizeIdentity(identity, intensity, row.value);
+    res.json({ optimized });
+  } catch (err: any) {
+    console.error("Optimize identity error:", err?.message || err);
+    res.status(500).json({ error: err?.message || "Failed to optimize identity" });
+  }
 });
 
 router.delete("/:id", requireRole("canManageAgents"), async (req, res) => {
