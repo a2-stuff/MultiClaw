@@ -1,6 +1,6 @@
 # MultiClaw Documentation
 
-**Version:** 1.4 | **Updated:** March 2026
+**Version:** 1.5 | **Updated:** March 2026
 
 ---
 
@@ -190,11 +190,11 @@ Check the dashboard startup logs for the generated password:
 
 ```
 Admin user created: admin@multiclaw.dev
-Generated admin password: <random-password>
+Generated admin password: abc******************** (check .env to retrieve)
 Save this password — it will not be shown again.
 ```
 
-Navigate to the dashboard URL (e.g., `http://localhost:3100`) and log in with these credentials. All users who register through the login page are assigned the `viewer` role. An admin must promote them from the **Users** page if higher access is required.
+Navigate to the dashboard URL (e.g., `http://localhost:3100`) and log in with these credentials. Public registration is disabled. All user accounts must be created by an administrator. New accounts are assigned the `viewer` role by default and can be promoted from the **Users** page.
 
 ---
 
@@ -285,6 +285,7 @@ Use this to create a new agent on the same machine as the dashboard.
    - Assign an available port starting from `8101` (incrementing for each new agent)
    - Generate a unique API key and write the agent's `.env` automatically
    - Start the agent process in the background
+   - Bind the agent to `127.0.0.1` (localhost only) — direct network access to the agent is blocked; all communication goes through the dashboard proxy
 
 Each spawned agent is fully independent with its own skills directory, plugins directory, and configuration. Agents do not share state with one another.
 
@@ -295,7 +296,7 @@ When an agent is selected in the sidebar, its detail view shows a tabbed interfa
 | Tab | Available to | Description |
 |-----|-------------|-------------|
 | **Overview** | All | Status, system metrics, quick stats, action buttons |
-| **Tasks** | All | Send tasks, view history, delete queued tasks |
+| **Tasks** | All (dispatch: admin/operator) | Send tasks, view history, delete queued tasks |
 | **Identity** | All (edit: admin/operator) | Per-agent system prompt editor |
 | **Logs** | All | Real-time log viewer with filtering |
 | **Skills** | All | View and manage installed skills |
@@ -456,6 +457,8 @@ Before dispatching, the dashboard searches the knowledge base for relevant entri
 **Other dispatch methods:**
 - The **Tasks** tab of a specific agent — dispatches only to that agent
 - Via the **API** — `POST /api/tasks/dispatch` with `{ "prompt": "...", "agentIds": ["..."] }` for agent dispatch, or `POST /api/tasks/ask` with `{ "prompt": "..." }` for dashboard-direct queries
+
+Both task dispatch endpoints require the `canExecuteTasks` permission (admin or operator role).
 
 **Task history:**
 

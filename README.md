@@ -128,7 +128,7 @@ The installer is a full interactive wizard. It will prompt you for:
 - Tailscale integration (optional)
 - TLS / Let's Encrypt certificate setup (optional)
 
-The admin user is seeded from `.env` on first startup — no separate registration step required.
+The admin user is seeded from `.env` on first startup. Public registration is disabled — additional users must be created by an administrator from the Users page.
 
 ### 2. Review your environment
 
@@ -304,14 +304,16 @@ In-app help page with FAQ and guides covering common setup scenarios, troublesho
 
 ## Security
 
-MultiClaw is designed for self-hosted, trusted environments with defence-in-depth throughout:
+MultiClaw is designed for self-hosted environments with defence-in-depth throughout — suitable for both private networks and public internet exposure:
 
-- **Authentication:** JWT tokens for dashboard sessions; HMAC-signed API keys for agent-to-dashboard communication; bcrypt password hashing.
-- **Authorization:** Role-based access control (`admin`, `operator`, `viewer`) enforced on all API routes.
-- **Input hardening:** Request body size limits (1 MB cap); strict input validation and allowlist-based parameter checking on all endpoints; path traversal protection for all file operations.
-- **Transport security:** Helmet Content Security Policy headers; HTTPS/TLS support for both dashboard and agent; configurable and dynamically managed CORS origins.
+- **Authentication:** JWT tokens for dashboard sessions; HMAC-signed API keys for agent-to-dashboard communication; bcrypt password hashing. Public registration is disabled — all accounts are admin-created.
+- **Authorization:** Role-based access control (`admin`, `operator`, `viewer`) enforced on all API routes including plugins, skills, tasks, sandbox, and agent management.
+- **Input hardening:** Request body size limits (1 MB JSON, 50 MB uploads); upload filename sanitization; ZIP path traversal protection; strict input validation on all endpoints.
+- **Transport security:** Content Security Policy with strict directives; X-Frame-Options: DENY; Referrer-Policy headers; HTTPS/TLS support; dynamically managed CORS origins.
+- **SSE security:** Short-lived ticket exchange for Server-Sent Events — JWT tokens never appear in URL query parameters.
 - **Rate limiting:** Applied to authentication endpoints and all sensitive API routes.
-- **Audit logging:** Every significant action is recorded with actor, timestamp, and outcome. Sanitized error messages prevent information leakage in responses.
+- **Agent isolation:** Spawned agents bind to `127.0.0.1` — accessible only through the authenticated dashboard proxy. Each agent runs in its own virtualenv with isolated config.
+- **Audit logging:** Every significant action is recorded with actor, timestamp, and outcome.
 - **Networking:** Optional Tailscale integration provides encrypted mesh networking between dashboard and remote agents with zero firewall configuration.
 
 ---

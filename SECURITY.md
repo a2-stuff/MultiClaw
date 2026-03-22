@@ -49,7 +49,7 @@ ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=your-strong-password-here
 ```
 
-If these variables are absent, no admin account is created and the dashboard will be inaccessible until one is added directly in the database. Change the password immediately after the first login.
+If these variables are absent, an admin account is auto-generated with a random password printed to the console (masked — only the first 3 characters are shown; retrieve the full password from `.env`). Public registration is disabled; all user accounts must be created by an administrator. Change the password immediately after the first login.
 
 ### Agent API Key Authentication
 
@@ -97,12 +97,13 @@ Requests from origins not on the allowlist are rejected.
 
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
 - `Strict-Transport-Security` (when TLS is active)
 - Additional Helmet defaults.
 
 ### Content Security Policy
 
-A Content Security Policy (CSP) is applied. The policy is configurable via environment variables. Tighten the CSP for production deployments; development defaults are intentionally relaxed.
+A strict Content Security Policy (CSP) is enforced on all responses: `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'` (required for Tailwind CSS), `img-src 'self' data: blob:`, `connect-src 'self'`, `font-src 'self'`, `frame-ancestors 'none'`.
 
 ### TLS / HTTPS
 
@@ -129,13 +130,15 @@ WebSocket connections from the dashboard to agents require a valid JWT token. Un
 
 ### Path Traversal Protection
 
-- Skill and plugin filenames are sanitized before any filesystem operation.
+- Skill upload filenames are sanitized using `path.basename()` with null byte stripping before any filesystem operation.
+- ZIP extraction validates that resolved paths stay within the destination directory using `path.resolve()` prefix checks.
+- Agent spawn directories are validated against `~/.multiclaw/agents/` before deletion to prevent arbitrary directory removal.
 - All resolved paths are confirmed to remain within their permitted directories before access is granted.
 
 ### File Upload Validation
 
-- Uploaded filenames for skills and plugins are sanitized.
-- File size limits are enforced on all upload endpoints.
+- Uploaded filenames for skills and plugins are sanitized with `path.basename()` and null byte removal.
+- File size limits (50MB per file) are enforced on all upload endpoints via multer configuration.
 
 ### Request Body & Query Validation
 
@@ -156,6 +159,8 @@ Each spawned agent receives its own isolated environment under `~/.multiclaw/age
 - Its own configuration, skills, and plugins.
 
 No two agents share a runtime environment.
+
+Spawned agents bind to `127.0.0.1` (localhost only). Direct network access to agent ports is blocked; all external communication goes through the dashboard proxy, which enforces authentication and authorization.
 
 ### API Keys
 
@@ -188,7 +193,7 @@ The dashboard has its own LLM-powered administrator profile for answering direct
 
 ### Cron Execution
 
-Scheduled cron commands run in isolated subprocesses. Cron run output is logged and accessible from the dashboard.
+Scheduled cron commands run in isolated subprocesses with a restricted environment variable allowlist (`PATH`, `HOME`, `LANG`, `USER`, `SHELL`, `TERM`, `HOSTNAME`, `LC_ALL`, `TZ`, `TMPDIR`). API keys and secrets are excluded from the cron execution environment. Cron command text is not logged to prevent secret leakage. Run output is stored and accessible from the dashboard.
 
 ---
 
@@ -231,6 +236,7 @@ Complete all of the following before deploying MultiClaw in a production environ
 - [ ] Configure auto-renewal for Let's Encrypt certificates (see [TLS Setup](#tls-setup)).
 - [ ] Use Tailscale for agent-to-dashboard communication where possible; consider `tailscale-only` mode.
 - [ ] Set firewall rules to restrict agent ports (8100+) to the dashboard IP only.
+- [ ] Verify spawned agents bind to `127.0.0.1` — they should not be directly accessible from the network.
 
 **Agent Keys**
 - [ ] Confirm each agent has a unique, freshly generated API key.
@@ -351,6 +357,19 @@ MULTICLAW_TAILSCALE_TAG=tag:multiclaw-agent
 ```
 
 When `MULTICLAW_TAILSCALE_MODE=tailscale-only`, the service does not bind to any public network interface and only accepts connections over the Tailscale network. This is the most secure option for agent-to-dashboard communication.
+
+---
+
+### SSE Authentication
+
+Server-Sent Events (SSE) connections use a short-lived ticket exchange mechanism instead of passing JWT tokens in URL query parameters:
+
+1. The client authenticates via `POST /api/sse/ticket` with the JWT in the `Authorization` header.
+2. The server issues a single-use ticket (cryptographically random, 30-second TTL).
+3. The client opens the EventSource with `?ticket=<ticket>` instead of `?token=<jwt>`.
+4. The server validates and deletes the ticket on first use.
+
+This prevents JWT tokens from appearing in server access logs, browser history, and Referer headers.
 
 ---
 

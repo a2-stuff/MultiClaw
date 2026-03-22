@@ -2,6 +2,30 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.5.0] - 2026-03-22
+
+### Security
+- **Registration disabled** — Public registration endpoint (`POST /api/auth/register`) now returns 403. Only admin-seeded users can access the system. Prevents unauthorized account creation on public-facing deployments.
+- **RBAC enforcement on 20 endpoints** — Added `requireRole` middleware to plugins, skills, plugin-registry, sandbox, proxy, tasks, and delegation routes. Viewers can no longer upload plugins, deploy skills, execute sandbox code, restart agents, or dispatch tasks.
+- **Content Security Policy enabled** — Helmet now enforces a full CSP directive set (`default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: blob:`, `connect-src 'self'`, `font-src 'self'`, `frame-ancestors 'none'`).
+- **Security headers hardened** — Added `X-Frame-Options: DENY` and `Referrer-Policy: strict-origin-when-cross-origin` via Helmet.
+- **Version info removed from public health endpoints** — `GET /health` on both dashboard and agent no longer returns the version string. Version remains available on the authenticated `/health/detailed` endpoint.
+- **Upload filename sanitization** — Skill upload filenames are now sanitized with `path.basename()` and null byte stripping to prevent path traversal.
+- **Upload file size limits** — Both skill and plugin upload endpoints now enforce a 50MB per-file size limit via multer.
+- **ZIP path traversal hardening** — Added `path.resolve()` prefix validation to skill ZIP extraction, ensuring extracted files cannot escape the destination directory.
+- **Shell injection eliminated in agent spawn** — Replaced `execSync("ln -s ...")` with `fs.symlinkSync()` in agent spawn to prevent command injection via crafted paths.
+- **Spawn directory validation** — Agent deletion now validates that `spawnDir` is within `~/.multiclaw/agents/` before executing `rmSync`, preventing arbitrary directory deletion via database manipulation.
+- **Spawned agents bound to localhost** — Local agents now bind to `127.0.0.1` instead of `0.0.0.0`, ensuring they are only accessible through the dashboard proxy.
+- **Sensitive fields stripped from API responses** — `GET /api/agents` no longer returns `spawnDir`, `spawnPid`, `containerId`, or `containerImage` to prevent infrastructure detail leakage.
+- **SSE ticket exchange** — SSE connections now use short-lived, single-use tickets (30s TTL) instead of passing the long-lived JWT in URL query parameters. Prevents token leakage in server logs, browser history, and Referer headers.
+- **Log sanitization** — Tool arguments, cron commands, and HTTP response bodies are no longer logged in plaintext. Admin seed password output is masked.
+
+### Changed
+- Documentation version updated to 1.5
+- Plugins section moved from README.md to dedicated PLUGINS.md
+
+---
+
 ## [1.4.0] - 2026-03-22
 
 ### Added
@@ -208,6 +232,7 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.5.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.5.0
 [1.4.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.4.0
 [1.3.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.3.0
 [1.2.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.2.0
