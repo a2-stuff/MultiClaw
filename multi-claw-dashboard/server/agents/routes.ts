@@ -241,6 +241,9 @@ router.post("/:id/optimize-identity", requireRole("canManageAgents"), async (req
       return res.status(400).json({ error: "intensity must be one of: light, medium, heavy" });
     }
 
+    const agent = db.select().from(agents).where(eq(agents.id, req.params.id)).get();
+    if (!agent) return res.status(404).json({ error: "Agent not found" });
+
     // Read global Anthropic API key from settings table
     const row = db.select().from(settings).where(eq(settings.key, "anthropic_api_key")).get();
     if (!row?.value) {
@@ -250,8 +253,8 @@ router.post("/:id/optimize-identity", requireRole("canManageAgents"), async (req
     const optimized = await optimizeIdentity(identity, intensity, row.value);
     res.json({ optimized });
   } catch (err: any) {
-    console.error("Optimize identity error:", err?.message || err);
-    res.status(500).json({ error: err?.message || "Failed to optimize identity" });
+    console.error("Optimize identity error:", err.message || err);
+    res.status(500).json({ error: err.message || "Failed to optimize identity" });
   }
 });
 
