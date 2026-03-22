@@ -6,12 +6,15 @@ Add an "Optimize Prompt" button to the Agent Identity tab that uses the Anthropi
 
 ## Decisions
 
-- **LLM backend**: Anthropic API called from dashboard server using the agent's stored API key
+- **LLM backend**: Anthropic API called from dashboard server using the global Anthropic API key (from `settings` table, key `"anthropic_api_key"`)
+- **SDK**: Use `@anthropic-ai/sdk` (already a project dependency)
 - **Presentation**: Side-by-side diff modal (original vs optimized) with Accept/Discard/Re-optimize
 - **Intensity levels**: User-selectable Light/Medium/Heavy dropdown
 - **Context isolation**: Optimizer has no MultiClaw-specific knowledge — identity is purely about who the agent is
 - **Model**: `claude-sonnet-4-6` for optimization calls
 - **Button placement**: After Clear, before Save Identity
+- **Streaming**: Non-streaming — the modal shows the complete result, so streaming adds complexity without UX benefit
+- **Audit logging**: Not logged — this is a read-only preview action with no side effects. API usage is tracked by Anthropic's own billing.
 
 ## UI Flow
 
@@ -22,13 +25,15 @@ Add an "Optimize Prompt" button to the Agent Identity tab that uses the Anthropi
 5. Side-by-side modal appears: original (left, red header) vs optimized (right, green header)
 6. Modal footer: Discard | Re-optimize | Accept
    - **Discard**: closes modal, no changes
-   - **Re-optimize**: calls API again with same intensity, replaces right side
+   - **Re-optimize**: calls API again with same intensity, replaces right side (debounced — button disabled for 3 seconds after each call to prevent rapid repeated clicks)
    - **Accept**: writes optimized text into textarea, closes modal, marks dirty state so Save is enabled
 7. User clicks Save Identity to persist (existing flow)
 
 ## API
 
 ### `POST /api/agents/:id/optimize-identity`
+
+Uses POST despite being side-effect-free because the request has a body and is non-idempotent (each call may return different results).
 
 **Auth**: Requires `canManageAgents` role (same as save identity)
 
@@ -48,14 +53,15 @@ Add an "Optimize Prompt" button to the Agent Identity tab that uses the Anthropi
 ```
 
 **Error responses**:
-- `400` — missing identity text or invalid intensity
+- `400` — missing identity text, invalid intensity, or identity exceeds 50,000 characters
 - `401` — unauthorized
+- `422` — no Anthropic API key configured in dashboard settings
 - `500` — Anthropic API error (with message)
 
 **Implementation**:
-1. Validate input (identity is non-empty string, intensity is one of light/medium/heavy)
-2. Look up agent's Anthropic API key from database
-3. Call Anthropic API with meta-prompt + user's identity text
+1. Validate input (identity is non-empty string, ≤50,000 chars, intensity is one of light/medium/heavy)
+2. Read global Anthropic API key from `settings` table (`key = "anthropic_api_key"`)
+3. Call Anthropic API via `@anthropic-ai/sdk` with meta-prompt + user's identity text
 4. Return optimized text — no side effects, nothing saved
 
 ### Meta-Prompt Strategy
@@ -84,7 +90,8 @@ Changes to existing component:
 - Add loading state: spinner on button, disable all buttons during optimization
 - Add state for modal visibility and optimized text
 - Only show Optimize button for users with `canManage` role
-- Optimize button disabled when textarea is empty
+- Optimize button always visible when `canManage` is true, but disabled when textarea is empty
+- Client-side validation: identity must be ≤50,000 characters
 
 ### New: `OptimizeModal.tsx`
 
@@ -105,30 +112,31 @@ Side-by-side diff modal component:
 - Header: "Optimized Prompt Preview" + intensity label + close button
 - Body: two-column grid, left = original (red "ORIGINAL" label), right = optimized (green "OPTIMIZED" label)
 - Both columns: monospace font, scrollable, pre-wrap whitespace
-- Footer: Discard (secondary), Re-optimize (purple), Accept (green)
+- Footer: Discard (secondary), Re-optimize (purple, 3s debounce), Accept (green)
 
 ## Server-Side Files
 
 ### New: `server/agents/optimize.ts`
 
 Contains:
-- `optimizeIdentity(identity: string, intensity: string, apiKey: string): Promise<string>` — builds meta-prompt, calls Anthropic API, returns optimized text
+- `optimizeIdentity(identity: string, intensity: string, apiKey: string): Promise<string>` — builds meta-prompt, calls Anthropic API via SDK, returns optimized text
 - Meta-prompt templates per intensity level
 - Error handling for API failures
+- 30-second timeout on API call
 
 ### Modified: `server/agents/routes.ts`
 
 Add new route:
-- `POST /agents/:id/optimize-identity` — validates input, retrieves API key, calls `optimizeIdentity`, returns result
+- `POST /agents/:id/optimize-identity` — validates input, reads global API key from `settings` table, calls `optimizeIdentity`, returns result
 
 ## Data Flow
 
 ```
 User clicks Optimize
   → Frontend POST /api/agents/:id/optimize-identity { identity, intensity }
-    → Server validates input
-    → Server reads agent's Anthropic API key from DB
-    → Server calls Anthropic API (claude-sonnet-4-6) with meta-prompt
+    → Server validates input (non-empty, ≤50k chars, valid intensity)
+    → Server reads global Anthropic API key from settings table
+    → Server calls Anthropic API (claude-sonnet-4-6) via @anthropic-ai/sdk
     → Server returns { optimized: string }
   → Frontend opens modal with original vs optimized
   → User clicks Accept
@@ -141,8 +149,8 @@ User clicks Optimize
 ## Edge Cases
 
 - **Empty textarea**: Optimize button disabled when no text to optimize
-- **API key missing**: Return 500 with clear error message "No Anthropic API key configured for this agent"
+- **API key missing**: Return 422 with message "No Anthropic API key configured in dashboard settings"
 - **API timeout**: 30-second timeout on the Anthropic call, surface error in UI
-- **Very long identity**: Pass through — let the Anthropic API handle token limits
-- **Re-optimize**: Same flow as initial optimize, replaces right side of modal
+- **Very long identity**: Client-side limit of 50,000 characters with validation message; server rejects >50k with 400
+- **Re-optimize**: Same flow as initial optimize, replaces right side of modal. Button debounced (3s cooldown) to prevent rapid repeated API calls
 - **Modal close**: Clicking overlay or X = same as Discard
