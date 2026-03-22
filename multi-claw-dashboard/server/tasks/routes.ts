@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireRole } from "../auth/middleware.js";
 import { runOrchestration, runDashboardQuery, getOrchestration, listOrchestrations } from "./orchestrator.js";
 
 const router = Router();
 router.use(requireAuth);
 
 // Dashboard answers directly (no agents tagged)
-router.post("/ask", async (req, res) => {
+router.post("/ask", requireRole("canExecuteTasks"), async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt required" });
@@ -19,7 +19,7 @@ router.post("/ask", async (req, res) => {
 });
 
 // Dispatch to agents (1 = direct, 2+ = parallel)
-router.post("/dispatch", async (req, res) => {
+router.post("/dispatch", requireRole("canExecuteTasks"), async (req, res) => {
   try {
     const { prompt, agentIds } = req.body;
     if (!prompt || !agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {

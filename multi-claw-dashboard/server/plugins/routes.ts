@@ -3,15 +3,18 @@ import multer from "multer";
 import { v4 as uuid } from "uuid";
 import { db } from "../db/index.js";
 import { plugins, agentPlugins } from "../db/schema.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireRole } from "../auth/middleware.js";
 import { transferPluginToAgent } from "./transfer.js";
 import { eq } from "drizzle-orm";
 
-const upload = multer({ dest: "uploads/plugins/" });
+const upload = multer({
+  dest: "uploads/plugins/",
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max per file
+});
 const router = Router();
 router.use(requireAuth);
 
-router.post("/", upload.array("files"), async (req, res) => {
+router.post("/", requireRole("canManageAgents"), upload.array("files"), async (req, res) => {
   try {
     const { name, description, version, author } = req.body;
     const id = uuid();
@@ -32,7 +35,7 @@ router.get("/", async (_req, res) => {
   res.json(all);
 });
 
-router.post("/:pluginId/deploy/:agentId", async (req, res) => {
+router.post("/:pluginId/deploy/:agentId", requireRole("canManageAgents"), async (req, res) => {
   const { pluginId, agentId } = req.params;
   const plugin = db.select().from(plugins).where(eq(plugins.id, pluginId)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });

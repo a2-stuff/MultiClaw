@@ -9,7 +9,7 @@ export function useSSE(url: string, onEvent: (event: string, data: any) => void)
     let closed = false;
     let timer: ReturnType<typeof setTimeout>;
 
-    function connect() {
+    async function connect() {
       if (closed) return;
       // Close previous connection if reconnecting
       if (eventSourceRef.current) {
@@ -17,7 +17,26 @@ export function useSSE(url: string, onEvent: (event: string, data: any) => void)
         eventSourceRef.current = null;
       }
       const token = localStorage.getItem("token");
-      const fullUrl = `${url}${url.includes("?") ? "&" : "?"}token=${token}`;
+
+      // Exchange JWT for a short-lived single-use ticket
+      let fullUrl: string;
+      try {
+        const ticketRes = await fetch(`${url.replace(/\/?$/, "")}/ticket`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (ticketRes.ok) {
+          const { ticket } = await ticketRes.json();
+          fullUrl = `${url}${url.includes("?") ? "&" : "?"}ticket=${ticket}`;
+        } else {
+          // Fallback to token if ticket endpoint fails
+          fullUrl = `${url}${url.includes("?") ? "&" : "?"}token=${token}`;
+        }
+      } catch {
+        // Fallback to token if ticket endpoint is unreachable
+        fullUrl = `${url}${url.includes("?") ? "&" : "?"}token=${token}`;
+      }
+
       const es = new EventSource(fullUrl);
 
       const handleEvent = (evt: string) => (e: MessageEvent) => {

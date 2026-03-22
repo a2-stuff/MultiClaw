@@ -56,7 +56,19 @@ seedPluginRegistry();
 seedAdminUser();
 loadCorsOrigins();
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  frameguard: { action: "deny" },
 }));
 app.use(cors({
   origin: (origin, callback) => {
@@ -72,7 +84,7 @@ app.use("/api/agents/connect", connectLimiter);
 app.use("/api/", apiLimiter);
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", version: "0.1.0" });
+  res.json({ status: "ok" });
 });
 
 app.use("/api/agents/connect", connectRouter); // Public — agent auth via API key in body

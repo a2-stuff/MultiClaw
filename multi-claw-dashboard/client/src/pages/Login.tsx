@@ -1,3 +1,6 @@
+// NOTE: Public registration is disabled server-side (returns 403).
+// Only admin-seeded users can log in. To re-enable, restore the
+// server handler in server/auth/routes.ts.
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 

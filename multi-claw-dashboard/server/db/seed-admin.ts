@@ -25,7 +25,7 @@ export async function seedAdminUser(): Promise<void> {
 
   console.log(`Admin user created: ${email}`);
   if (generated) {
-    console.log(`Generated admin password: ${password}`);
+    console.log(`Generated admin password: ${password.slice(0, 3)}${"*".repeat(password.length - 3)} (check .env to retrieve)`);
     console.log("Save this password — it will not be shown again.");
   }
 }

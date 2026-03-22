@@ -37,7 +37,6 @@ async def health():
     """Public health check - minimal information only."""
     return {
         "status": "healthy",
-        "version": _version,
     }
 
 

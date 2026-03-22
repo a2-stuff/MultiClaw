@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { db } from "../db/index.js";
 import { pluginRegistry, agentRegistryPlugins, agents } from "../db/schema.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireRole } from "../auth/middleware.js";
 import { resolveAgentUrl } from "../tailscale/helpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,7 +48,7 @@ router.get("/", (_req, res) => {
 });
 
 // POST / — create new registry entry
-router.post("/", async (req, res) => {
+router.post("/", requireRole("canManageAgents"), async (req, res) => {
   const { name, slug, description, version, author, repoUrl } = req.body;
   if (!name || !slug) return res.status(400).json({ error: "name and slug are required" });
 
@@ -74,7 +74,7 @@ router.get("/:id", (req, res) => {
 });
 
 // PUT /:id — update entry fields
-router.put("/:id", (req, res) => {
+router.put("/:id", requireRole("canManageAgents"), (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
@@ -100,7 +100,7 @@ router.put("/:id", (req, res) => {
 });
 
 // DELETE /:id — remove entry and all agent_registry_plugins rows
-router.delete("/:id", (req, res) => {
+router.delete("/:id", requireRole("canManageAgents"), (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
@@ -110,7 +110,7 @@ router.delete("/:id", (req, res) => {
 });
 
 // POST /:id/deploy — deploy to specified agents
-router.post("/:id/deploy", async (req, res) => {
+router.post("/:id/deploy", requireRole("canManageAgents"), async (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
@@ -324,7 +324,7 @@ router.post("/:id/deploy", async (req, res) => {
 });
 
 // POST /:id/undeploy — undeploy from specified agents
-router.post("/:id/undeploy", async (req, res) => {
+router.post("/:id/undeploy", requireRole("canManageAgents"), async (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 
@@ -389,7 +389,7 @@ router.post("/:id/undeploy", async (req, res) => {
 });
 
 // POST /:id/update — update plugin on specified agents
-router.post("/:id/update", async (req, res) => {
+router.post("/:id/update", requireRole("canManageAgents"), async (req, res) => {
   const plugin = db.select().from(pluginRegistry).where(eq(pluginRegistry.id, req.params.id)).get();
   if (!plugin) return res.status(404).json({ error: "Plugin not found" });
 

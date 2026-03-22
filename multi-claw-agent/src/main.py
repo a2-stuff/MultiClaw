@@ -49,7 +49,7 @@ async def _try_connect(agent_url: str) -> bool:
             logger.info(f"Connected to dashboard as '{settings.agent_name}' (id: {settings.agent_id})")
             return True
         else:
-            logger.info(f"Dashboard registration failed: {resp.status_code} {resp.text}")
+            logger.info(f"Dashboard registration failed: {resp.status_code}")
             return False
     except Exception as e:
         logger.info(f"Could not reach dashboard: {e}")

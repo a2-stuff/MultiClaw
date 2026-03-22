@@ -6,7 +6,7 @@ import { v4 as uuid } from "uuid";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { skills, agentSkills, skillProviders } from "../db/schema.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireRole } from "../auth/middleware.js";
 import { transferSkillToAgent } from "./transfer.js";
 import { getProviderForUrl, getProviderByType } from "./providers/index.js";
 import { extractZip } from "./zip.js";
@@ -23,12 +23,19 @@ const storage = multer.diskStorage({
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
-  filename: (_req, file, cb) => cb(null, file.originalname),
+  filename: (_req, file, cb) => {
+    // Strip path separators and null bytes to prevent path traversal
+    const safe = path.basename(file.originalname).replace(/[\x00]/g, "");
+    cb(null, safe);
+  },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max per file
+});
 
 // Upload custom skill
-router.post("/", upload.array("files"), async (req, res) => {
+router.post("/", requireRole("canManageAgents"), upload.array("files"), async (req, res) => {
   try {
     const { name, description, version, author } = req.body;
     const id = (req as any)._skillId || uuid();
@@ -52,7 +59,7 @@ router.get("/", async (_req, res) => {
 });
 
 // Import skill from URL or provider
-router.post("/import", async (req, res) => {
+router.post("/import", requireRole("canManageAgents"), async (req, res) => {
   try {
     const { url, providerId, slug, name, description } = req.body;
     let providerType: string;
@@ -152,7 +159,7 @@ router.post("/import", async (req, res) => {
 });
 
 // Deploy skill to agent
-router.post("/:skillId/deploy/:agentId", async (req, res) => {
+router.post("/:skillId/deploy/:agentId", requireRole("canManageAgents"), async (req, res) => {
   const { skillId, agentId } = req.params;
   const skill = db.select().from(skills).where(eq(skills.id, skillId as string)).get();
   if (!skill) return res.status(404).json({ error: "Skill not found" });
@@ -176,7 +183,7 @@ router.post("/:skillId/deploy/:agentId", async (req, res) => {
 });
 
 // Delete skill
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole("canManageAgents"), async (req, res) => {
   const skillId = req.params.id as string;
   const skill = db.select().from(skills).where(eq(skills.id, skillId)).get();
   if (!skill) return res.status(404).json({ error: "Skill not found" });

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import crypto from "crypto";
+import path from "path";
+import os from "os";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { agents, agentSkills, agentPlugins, agentRegistryPlugins, agentTasks, skills, plugins, pluginRegistry, apiKeys, settings } from "../db/schema.js";
@@ -176,7 +178,8 @@ router.get("/", async (_req, res) => {
     containerId: agents.containerId, containerImage: agents.containerImage,
     containerStatus: agents.containerStatus,
   }).from(agents).all();
-  res.json(allAgents);
+  const sanitized = allAgents.map(({ spawnDir, spawnPid, containerId, containerImage, ...safe }) => safe);
+  res.json(sanitized);
 });
 
 // Update agent model configuration
@@ -192,7 +195,7 @@ router.patch("/:id/model", requireRole("canManageAgents"), async (req, res) => {
 router.get("/:id", async (req, res) => {
   const agent = db.select().from(agents).where(eq(agents.id, req.params.id)).get();
   if (!agent) return res.status(404).json({ error: "Agent not found" });
-  const { apiKey, ...safe } = agent;
+  const { apiKey, spawnDir, spawnPid, containerId, containerImage, ...safe } = agent;
   res.json(safe);
 });
 
@@ -264,6 +267,11 @@ router.delete("/:id", requireRole("canManageAgents"), async (req, res) => {
 
   // Clean up spawned agent: kill process and remove directory
   if (agent.spawnedLocally && agent.spawnDir) {
+    const AGENTS_BASE = path.join(os.homedir(), ".multiclaw", "agents");
+    const resolved = path.resolve(agent.spawnDir);
+    if (!resolved.startsWith(path.resolve(AGENTS_BASE) + path.sep)) {
+      return res.status(400).json({ error: "Invalid spawn directory" });
+    }
     if (agent.spawnPid) {
       try { process.kill(agent.spawnPid, "SIGTERM"); } catch {}
     }

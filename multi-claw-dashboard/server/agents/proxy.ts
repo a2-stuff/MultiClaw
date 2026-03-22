@@ -118,7 +118,7 @@ router.get("/:agentId/logs", async (req, res) => {
   }
 });
 
-router.delete("/:agentId/logs", async (req, res) => {
+router.delete("/:agentId/logs", requireRole("canManageAgents"), async (req, res) => {
   const agent = db.select().from(agents).where(eq(agents.id, req.params.agentId)).get();
   if (!agent) return res.status(404).json({ error: "Agent not found" });
   try {
@@ -133,7 +133,7 @@ router.delete("/:agentId/logs", async (req, res) => {
   }
 });
 
-router.post("/:agentId/self-update", async (req, res) => {
+router.post("/:agentId/self-update", requireRole("canManageAgents"), async (req, res) => {
   const agent = db.select().from(agents).where(eq(agents.id, req.params.agentId)).get();
   if (!agent) return res.status(404).json({ error: "Agent not found" });
   try {
@@ -149,7 +149,7 @@ router.post("/:agentId/self-update", async (req, res) => {
   }
 });
 
-router.post("/:agentId/restart", async (req, res) => {
+router.post("/:agentId/restart", requireRole("canManageAgents"), async (req, res) => {
   const agent = db.select().from(agents).where(eq(agents.id, req.params.agentId)).get();
   if (!agent) return res.status(404).json({ error: "Agent not found" });
   try {

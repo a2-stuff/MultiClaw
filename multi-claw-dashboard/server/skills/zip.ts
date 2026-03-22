@@ -38,6 +38,10 @@ export function extractZip(zipBuffer: Buffer, destDir: string): Promise<Extracte
         }
 
         const fullPath = path.join(destDir, fileName);
+        const resolved = path.resolve(destDir, fileName);
+        if (!resolved.startsWith(path.resolve(destDir) + path.sep)) {
+          throw new Error(`Zip entry attempts path traversal: ${fileName}`);
+        }
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
 
         zipfile.openReadStream(entry, (err, readStream) => {

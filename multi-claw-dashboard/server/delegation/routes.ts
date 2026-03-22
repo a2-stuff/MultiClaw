@@ -76,7 +76,7 @@ router.delete("/permissions/:id", requireRole("canManageAgents"), async (req, re
 // === Delegation ===
 
 // Create delegation (orchestrated mode — dashboard routes the task)
-router.post("/delegate", async (req, res) => {
+router.post("/delegate", requireRole("canExecuteTasks"), async (req, res) => {
   try {
     const { fromAgentId, toAgentId, prompt } = req.body;
     if (!fromAgentId || !toAgentId || !prompt) {

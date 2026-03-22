@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { v4 as uuid } from "uuid";
+
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
@@ -10,23 +10,8 @@ import { requireAuth } from "./middleware.js";
 
 const router = Router();
 
-router.post("/register", async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: "email, password, and name required" });
-    if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
-    if (password.length > 128) return res.status(400).json({ error: "Password must be 128 characters or less" });
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return res.status(400).json({ error: "Invalid email format" });
-    const existing = db.select().from(users).where(eq(users.email, email)).get();
-    if (existing) return res.status(409).json({ error: "Email already registered" });
-    const id = uuid();
-    const passwordHash = await bcrypt.hash(password, 12);
-    const role = "viewer";
-    db.insert(users).values({ id, email, passwordHash, name, role }).run();
-    const token = jwt.sign({ id, email, role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
-    res.status(201).json({ user: { id, email, name, role }, token });
-  } catch (err) { res.status(500).json({ error: "Registration failed" }); }
+router.post("/register", (_req, res) => {
+  res.status(403).json({ error: "Registration is disabled. Contact an administrator." });
 });
 
 router.post("/login", async (req, res) => {

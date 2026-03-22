@@ -36,7 +36,7 @@ class CronExecutor:
     def execute(self, job_id: str, command: str, timeout: int = DEFAULT_TIMEOUT) -> dict:
         started_at = datetime.now(timezone.utc).isoformat()
         start_time = time.monotonic()
-        logger.info("Cron %s executing: %s", job_id, command[:200])
+        logger.info("Cron %s executing", job_id)
         try:
             result = subprocess.run(
                 command, shell=True, capture_output=True, text=True, timeout=timeout,

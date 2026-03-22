@@ -1,5 +1,5 @@
 import { execSync, spawn as cpSpawn } from "child_process";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import fs, { existsSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
@@ -48,8 +48,8 @@ export async function spawnLocalAgent(opts: SpawnOptions, userId: string): Promi
   mkdirSync(path.join(agentDir, "plugins"), { recursive: true });
 
   // Symlink src/ and pyproject.toml from source agent
-  execSync(`ln -s ${path.join(AGENT_SOURCE, "src")} ${path.join(agentDir, "src")}`);
-  execSync(`ln -s ${path.join(AGENT_SOURCE, "pyproject.toml")} ${path.join(agentDir, "pyproject.toml")}`);
+  fs.symlinkSync(path.join(AGENT_SOURCE, "src"), path.join(agentDir, "src"));
+  fs.symlinkSync(path.join(AGENT_SOURCE, "pyproject.toml"), path.join(agentDir, "pyproject.toml"));
 
   // Create isolated venv
   const venvDir = path.join(agentDir, ".venv");
@@ -69,7 +69,7 @@ export async function spawnLocalAgent(opts: SpawnOptions, userId: string): Promi
     `MULTICLAW_AGENT_ID=${agentId}`,
     `MULTICLAW_AGENT_SECRET=${apiKey}`,
     `MULTICLAW_PORT=${port}`,
-    `MULTICLAW_HOST=0.0.0.0`,
+    `MULTICLAW_HOST=127.0.0.1`,
     `MULTICLAW_DASHBOARD_URL=${dashboardUrl}`,
     `MULTICLAW_AUTO_REGISTER=false`,
     `MULTICLAW_BASE_DIR=${agentDir}`,
@@ -99,7 +99,7 @@ export async function spawnLocalAgent(opts: SpawnOptions, userId: string): Promi
 
   // Start process
   const pythonBin = path.join(venvDir, "bin", "python");
-  const proc = cpSpawn(pythonBin, ["-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", String(port)], {
+  const proc = cpSpawn(pythonBin, ["-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: agentDir,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -167,7 +167,7 @@ export function startSpawnedAgent(agentId: string): number {
   const venvDir = path.join(agent.spawnDir, ".venv");
   const pythonBin = path.join(venvDir, "bin", "python");
 
-  const proc = cpSpawn(pythonBin, ["-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", String(port)], {
+  const proc = cpSpawn(pythonBin, ["-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: agent.spawnDir,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],

@@ -123,7 +123,7 @@ class AgentBrain:
 
             # Execute each tool call and append results
             for tc in response["tool_calls"]:
-                logger.info(f"Executing tool: {tc['name']}({tc['arguments']})")
+                logger.info(f"Executing tool: {tc['name']}")
                 result = await execute_tool(tc["name"], tc["arguments"], valid_tools)
 
                 tool_calls_log.append({

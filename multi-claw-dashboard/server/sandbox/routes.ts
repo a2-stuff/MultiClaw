@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireRole } from "../auth/middleware.js";
 import { runInSandbox } from "./runner.js";
 import { isDockerAvailable, ensureBaseImage, getDocker } from "./image-cache.js";
 
@@ -7,7 +7,7 @@ const router = Router();
 router.use(requireAuth);
 
 // Run plugin in sandbox
-router.post("/run", async (req, res) => {
+router.post("/run", requireRole("canExecuteTasks"), async (req, res) => {
   try {
     const { pluginCode, input, config, agentId } = req.body;
     if (!pluginCode) return res.status(400).json({ error: "pluginCode required" });
