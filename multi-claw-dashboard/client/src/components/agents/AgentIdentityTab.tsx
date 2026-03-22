@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../../api/client";
 import type { Agent } from "../../lib/types";
+import { OptimizeModal } from "./OptimizeModal";
 
 export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage: boolean }) {
   const [identity, setIdentity] = useState("");
@@ -8,6 +9,13 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [dirty, setDirty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [intensity, setIntensity] = useState<"light" | "medium" | "heavy">("medium");
+  const [optimizing, setOptimizing] = useState(false);
+  const [showOptimizeModal, setShowOptimizeModal] = useState(false);
+  const [optimizedText, setOptimizedText] = useState("");
+  const [originalSnapshot, setOriginalSnapshot] = useState("");
+  const [reoptimizing, setReoptimizing] = useState(false);
+  const [optimizeCooldown, setOptimizeCooldown] = useState(false);
 
   useEffect(() => {
     api.get(`/agents/${agent.id}`).then((res) => {
@@ -46,6 +54,60 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
     setDirty(true);
   };
 
+  const optimize = async () => {
+    if (identity.length > 50000) {
+      setMsg({ text: "Identity must be 50,000 characters or fewer", ok: false });
+      setTimeout(() => setMsg(null), 6000);
+      return;
+    }
+    setOptimizing(true);
+    setMsg(null);
+    try {
+      const res = await api.post(`/agents/${agent.id}/optimize-identity`, {
+        identity,
+        intensity,
+      });
+      setOriginalSnapshot(identity);
+      setOptimizedText(res.data.optimized);
+      setShowOptimizeModal(true);
+    } catch (err: any) {
+      setMsg({
+        text: err.response?.data?.error || "Failed to optimize",
+        ok: false,
+      });
+      setTimeout(() => setMsg(null), 6000);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const handleReoptimize = async () => {
+    setReoptimizing(true);
+    setOptimizeCooldown(true);
+    try {
+      const res = await api.post(`/agents/${agent.id}/optimize-identity`, {
+        identity: originalSnapshot,
+        intensity,
+      });
+      setOptimizedText(res.data.optimized);
+    } catch (err: any) {
+      setMsg({
+        text: err.response?.data?.error || "Re-optimize failed",
+        ok: false,
+      });
+      setTimeout(() => setMsg(null), 6000);
+    } finally {
+      setReoptimizing(false);
+      setTimeout(() => setOptimizeCooldown(false), 3000);
+    }
+  };
+
+  const handleAccept = (text: string) => {
+    setIdentity(text);
+    setDirty(true);
+    setShowOptimizeModal(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -69,6 +131,22 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
                 Clear
               </button>
             )}
+            <button
+              onClick={optimize}
+              disabled={optimizing || !identity.trim()}
+              className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:bg-gray-700 disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 rounded-lg text-white text-xs font-medium transition"
+            >
+              {optimizing ? "Optimizing..." : "✨ Optimize Prompt"}
+            </button>
+            <select
+              value={intensity}
+              onChange={(e) => setIntensity(e.target.value as "light" | "medium" | "heavy")}
+              className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-gray-300 text-xs focus:outline-none"
+            >
+              <option value="light">Light</option>
+              <option value="medium">Medium</option>
+              <option value="heavy">Heavy</option>
+            </select>
             <button onClick={save} disabled={saving || !dirty}
               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-white text-xs font-medium transition">
               {saving ? "Saving..." : "Save Identity"}
@@ -98,6 +176,16 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
           {identity.length} characters · {identity.split(/\s+/).filter(Boolean).length} words
         </div>
       )}
+      <OptimizeModal
+        isOpen={showOptimizeModal}
+        original={originalSnapshot}
+        optimized={optimizedText}
+        intensity={intensity}
+        onAccept={handleAccept}
+        onDiscard={() => setShowOptimizeModal(false)}
+        onReoptimize={handleReoptimize}
+        isReoptimizing={reoptimizing || optimizeCooldown}
+      />
     </div>
   );
 }
