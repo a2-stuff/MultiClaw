@@ -15,7 +15,7 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
   const [optimizedText, setOptimizedText] = useState("");
   const [originalSnapshot, setOriginalSnapshot] = useState("");
   const [reoptimizing, setReoptimizing] = useState(false);
-  const [optimizeCooldown, setOptimizeCooldown] = useState(false);
+  const [optimizeError, setOptimizeError] = useState("");
 
   useEffect(() => {
     api.get(`/agents/${agent.id}`).then((res) => {
@@ -83,7 +83,7 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
 
   const handleReoptimize = async () => {
     setReoptimizing(true);
-    setOptimizeCooldown(true);
+    setOptimizeError("");
     try {
       const res = await api.post(`/agents/${agent.id}/optimize-identity`, {
         identity: originalSnapshot,
@@ -91,14 +91,9 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
       });
       setOptimizedText(res.data.optimized);
     } catch (err: any) {
-      setMsg({
-        text: err.response?.data?.error || "Re-optimize failed",
-        ok: false,
-      });
-      setTimeout(() => setMsg(null), 6000);
+      setOptimizeError(err.response?.data?.error || "Re-optimize failed");
     } finally {
       setReoptimizing(false);
-      setTimeout(() => setOptimizeCooldown(false), 3000);
     }
   };
 
@@ -184,7 +179,8 @@ export function AgentIdentityTab({ agent, canManage }: { agent: Agent; canManage
         onAccept={handleAccept}
         onDiscard={() => setShowOptimizeModal(false)}
         onReoptimize={handleReoptimize}
-        isReoptimizing={reoptimizing || optimizeCooldown}
+        isReoptimizing={reoptimizing}
+        error={optimizeError}
       />
     </div>
   );

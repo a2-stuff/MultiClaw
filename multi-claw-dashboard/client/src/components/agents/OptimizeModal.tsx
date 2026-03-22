@@ -7,6 +7,7 @@ interface OptimizeModalProps {
   onDiscard: () => void;
   onReoptimize: () => void;
   isReoptimizing: boolean;
+  error?: string;
 }
 
 export function OptimizeModal({
@@ -18,6 +19,7 @@ export function OptimizeModal({
   onDiscard,
   onReoptimize,
   isReoptimizing,
+  error,
 }: OptimizeModalProps) {
   if (!isOpen) return null;
 
@@ -85,6 +87,9 @@ export function OptimizeModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-700">
+          {error && (
+            <span className="text-red-400 text-xs mr-auto">{error}</span>
+          )}
           <button
             onClick={onDiscard}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition"
