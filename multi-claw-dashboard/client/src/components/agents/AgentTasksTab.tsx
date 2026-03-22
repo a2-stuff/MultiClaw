@@ -16,16 +16,23 @@ export function AgentTasksTab({ agent }: { agent: Agent }) {
   const [prompt, setPrompt] = useState("");
   const [sending, setSending] = useState(false);
 
-  const fetchTasks = () => {
-    setLoading(true);
-    setError("");
+  const fetchTasks = (silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     api.get(`/agents/${agent.id}/tasks`)
       .then((res) => setTasks(res.data.sort((a: Task, b: Task) => b.createdAt.localeCompare(a.createdAt))))
-      .catch(() => setError("Failed to load tasks"))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silent) setError("Failed to load tasks"); })
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
   useEffect(() => { fetchTasks(); }, [agent.id]);
+
+  // Poll for updates while any task is running or queued
+  useEffect(() => {
+    const hasActive = tasks.some((t) => t.status === "running" || t.status === "queued");
+    if (!hasActive) return;
+    const timer = setInterval(() => fetchTasks(true), 2000);
+    return () => clearInterval(timer);
+  }, [tasks]);
 
   const sendTask = async () => {
     if (!prompt.trim()) return;
@@ -54,7 +61,7 @@ export function AgentTasksTab({ agent }: { agent: Agent }) {
   if (error && tasks.length === 0) return (
     <div className="text-center py-8">
       <p className="text-red-400 text-sm mb-2">{error}</p>
-      <button onClick={fetchTasks} className="text-blue-400 text-sm hover:underline">Retry</button>
+      <button onClick={() => fetchTasks()} className="text-blue-400 text-sm hover:underline">Retry</button>
     </div>
   );
 
@@ -107,15 +114,13 @@ export function AgentTasksTab({ agent }: { agent: Agent }) {
                     <td className="px-4 py-3 text-gray-500 text-xs">{new Date(task.createdAt).toLocaleString()}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{task.completedAt ? new Date(task.completedAt).toLocaleString() : "—"}</td>
                     <td className="px-4 py-3">
-                      {(task.status === "queued" || task.status === "running") && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                          className="text-red-400 hover:text-red-300 text-xs transition"
-                          title="Delete task"
-                        >
-                          ✕
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                        className="text-red-400 hover:text-red-300 text-xs transition"
+                        title="Delete task"
+                      >
+                        ✕
+                      </button>
                     </td>
                   </tr>
                   {expandedId === task.id && (

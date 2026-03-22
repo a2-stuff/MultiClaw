@@ -2,6 +2,30 @@
 
 All notable changes to MultiClaw will be documented in this file.
 
+## [1.4.0] - 2026-03-22
+
+### Added
+- **Task Polling in Dashboard UI** — The agent tasks tab now automatically polls for status updates every 2 seconds while any task is in "running" or "queued" state. Tasks transition to their final status (completed/failed) in real time without requiring a manual page refresh. Polling stops automatically once all tasks reach a terminal state.
+- **Agent Task ID Tracking** — The dashboard now stores the agent-side `task_id` in the `agent_tasks` database table (`agent_task_id` column), enabling future re-checks of task status and better debugging of stuck tasks.
+- **Solidity Auditor Plugin** — Added the Pashov Audit Group's Solidity security auditor to the plugin registry. Runs 8 specialized agents in parallel (vector scan, math precision, access control, economic security, execution trace, invariant, periphery, first principles) to audit Solidity smart contracts. Installs as a skill-based git plugin from `https://github.com/pashov/skills`.
+- **Orchestrator Error Recovery** — When orchestrator task polling fails or times out, the `agent_tasks` database record is now properly updated to "failed" instead of being left permanently in "running" state.
+
+### Fixed
+- Agent tasks sent from the dashboard stayed in "running" status in the UI because the tasks tab only fetched once on mount and once after sending — now polls automatically
+- Dashboard task proxy timed out after 120 seconds, prematurely marking long-running tasks (browser automation, SEO analysis) as failed — increased to 10 minutes
+- Orchestrator `pollTaskCompletion` had the same 120-second timeout issue — increased to 10 minutes
+- Tool schema generation crash when tools lacked callable handlers — now silently filters invalid tools instead of crashing the entire agentic loop
+
+### Changed
+- Task proxy poll interval changed from 1 second to 2 seconds to reduce unnecessary requests
+- `AgentTasksTab` component uses silent polling (no loading spinner flash) during background refreshes
+- Delete button on tasks now visible for all task statuses (was restricted to queued/running only)
+
+### Database
+- New column `agent_task_id` (text, nullable) added to `agent_tasks` table
+
+---
+
 ## [1.3.0] - 2026-03-21
 
 ### Added
@@ -184,6 +208,7 @@ All notable changes to MultiClaw will be documented in this file.
 - In-app Help page
 - Roadmap design spec for 10 feature phases
 
+[1.4.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.4.0
 [1.3.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.3.0
 [1.2.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.2.0
 [1.1.0]: https://github.com/a2-stuff/MultiClaw/releases/tag/v1.1.0

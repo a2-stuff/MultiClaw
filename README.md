@@ -260,6 +260,7 @@ Plugins extend the agent runtime itself — adding new endpoints, integrations, 
 | **Docker** | MultiClaw | — | Install and manage Docker containers on the agent host — pull images, create/start/stop/remove containers, and control lifecycle |
 | **Portainer** | MultiClaw | Docker | Install Portainer CE Docker management UI on the agent host for visual container management |
 | **Tailscale** | MultiClaw | `TAILSCALE_AUTH_KEY` | Tailscale VPN mesh networking for secure, zero-config agent-to-dashboard communication with automatic peer discovery |
+| **Solidity Auditor** | Pashov Audit Group | — | AI-powered security auditor for Solidity smart contracts — runs 8 specialized agents in parallel (vector scan, math precision, access control, economic security, execution trace, invariant, periphery, first principles) |
 | **Hello Plugin** | MultiClaw | — | Minimal example plugin demonstrating the plugin interface — use as a template for building custom plugins |
 
 **Plugin Manifests:** Every plugin ships with a manifest that defines:

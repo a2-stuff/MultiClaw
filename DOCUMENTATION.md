@@ -1,6 +1,6 @@
 # MultiClaw Documentation
 
-**Version:** 1.2 | **Updated:** March 2026
+**Version:** 1.4 | **Updated:** March 2026
 
 ---
 
@@ -546,6 +546,7 @@ Plugins extend an agent's core functionality with integrations such as Docker ma
 | **Docker** | MultiClaw | built-in | — | — | `docker --version`, `docker info` |
 | **Portainer** | MultiClaw | built-in | `PORTAINER_PORT` (opt) | Docker | Container running, HTTPS responds |
 | **Tailscale** | MultiClaw | built-in | `TAILSCALE_AUTH_KEY` | — | `tailscale status` connected |
+| **Solidity Auditor** | Pashov Audit Group | git-plugin | — | — | Skill files present, attack vectors DB present |
 | **Hello Plugin** | MultiClaw | built-in | — | — | Activation succeeds |
 
 **Installing a plugin on an agent:**
@@ -610,6 +611,15 @@ All plugins in the registry **must** include a manifest. The manifest is a JSON 
       "timeout": 120
     }
   ],
+  "uninstallSteps": [
+    {
+      "id": "remove-cli",
+      "label": "Remove CLI tool",
+      "type": "command",
+      "command": "npm uninstall -g my-cli",
+      "timeout": 60
+    }
+  ],
   "healthChecks": [
     {
       "type": "command",
@@ -639,6 +649,11 @@ All plugins in the registry **must** include a manifest. The manifest is a JSON 
 | `postInstallSteps[].type` | string | `"command"`, `"script"`, `"copy-skills"`, or `"verify"` |
 | `postInstallSteps[].command` | string? | Shell command or script path to execute |
 | `postInstallSteps[].timeout` | number? | Timeout in seconds (default: 300) |
+| `uninstallSteps[].id` | string | Unique identifier for the uninstall step |
+| `uninstallSteps[].label` | string | Human-readable label shown during uninstall |
+| `uninstallSteps[].type` | string | `"command"` or `"script"` |
+| `uninstallSteps[].command` | string? | Shell command to execute during uninstall |
+| `uninstallSteps[].timeout` | number? | Timeout in seconds (default: 300) |
 | `healthChecks[].type` | string | `"command"`, `"http"`, `"python-import"`, or `"file-exists"` |
 | `healthChecks[].command` | string? | Shell command (for `command` type) |
 | `healthChecks[].url` | string? | URL to check (for `http` type) |

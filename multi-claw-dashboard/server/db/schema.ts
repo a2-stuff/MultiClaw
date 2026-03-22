@@ -57,6 +57,7 @@ export const agentTasks = sqliteTable("agent_tasks", {
   status: text("status", { enum: ["queued", "running", "completed", "failed", "cancelled"] }).notNull().default("queued"),
   result: text("result"),
   error: text("error"),
+  agentTaskId: text("agent_task_id"),
   createdBy: text("created_by").references(() => users.id),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   completedAt: text("completed_at"),

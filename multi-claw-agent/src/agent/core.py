@@ -83,8 +83,9 @@ class AgentBrain:
                 "turns": 1,
             }
 
-        # Build canonical tool schemas for the provider
-        canonical_tools = [generate_tool_schema(t) for t in tools]
+        # Build canonical tool schemas for the provider (skip tools without handlers)
+        valid_tools = [t for t in tools if callable(t.get("handler"))]
+        canonical_tools = [generate_tool_schema(t) for t in valid_tools]
 
         # Start conversation
         messages = [{"role": "user", "content": prompt}]
@@ -123,7 +124,7 @@ class AgentBrain:
             # Execute each tool call and append results
             for tc in response["tool_calls"]:
                 logger.info(f"Executing tool: {tc['name']}({tc['arguments']})")
-                result = await execute_tool(tc["name"], tc["arguments"], tools)
+                result = await execute_tool(tc["name"], tc["arguments"], valid_tools)
 
                 tool_calls_log.append({
                     "turn": turn + 1,

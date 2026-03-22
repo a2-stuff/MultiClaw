@@ -433,27 +433,36 @@ async function dispatchAndPoll(
       agentId: agent.id,
       prompt,
       status: "running",
+      agentTaskId: task_id,
       createdBy: orch.createdBy,
     })
     .run();
 
-  const result = await pollTaskCompletion(agent, task_id, orch.id, stepIndex);
+  try {
+    const result = await pollTaskCompletion(agent, task_id, orch.id, stepIndex);
 
-  db.update(agentTasks)
-    .set({ status: "completed", result, completedAt: new Date().toISOString() })
-    .where(eq(agentTasks.id, dbId))
-    .run();
+    db.update(agentTasks)
+      .set({ status: "completed", result, completedAt: new Date().toISOString() })
+      .where(eq(agentTasks.id, dbId))
+      .run();
 
-  broadcast("orchestration_step", {
-    id: orch.id,
-    stepIndex,
-    agentId: agent.id,
-    agentName: agent.name,
-    status: "completed",
-    result,
-  });
+    broadcast("orchestration_step", {
+      id: orch.id,
+      stepIndex,
+      agentId: agent.id,
+      agentName: agent.name,
+      status: "completed",
+      result,
+    });
 
-  return result;
+    return result;
+  } catch (err: any) {
+    db.update(agentTasks)
+      .set({ status: "failed", error: err.message, completedAt: new Date().toISOString() })
+      .where(eq(agentTasks.id, dbId))
+      .run();
+    throw err;
+  }
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
@@ -464,8 +473,8 @@ async function pollTaskCompletion(
   orchId: string,
   stepIndex: number
 ): Promise<string> {
-  const maxWait = 120_000;
-  const interval = 1_000;
+  const maxWait = 600_000;  // 10 minutes for long-running tasks
+  const interval = 2_000;
   let waited = 0;
 
   while (waited < maxWait) {

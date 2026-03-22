@@ -169,6 +169,23 @@ const manifests: Record<string, object> = {
       { type: "command", command: "echo 'Hello Plugin OK'", description: "Plugin activates without error" },
     ],
   },
+
+  "solidity-auditor": {
+    envVars: [],
+    dependencies: [],
+    systemRequirements: [],
+    postInstallSteps: [
+      { id: "copy-skills", label: "Copy skills to agent", type: "copy-skills", timeout: 60 },
+      { id: "verify-skills", label: "Verify skill files copied", type: "command", command: "ls -la $PLUGIN_DIR/repo/solidity-auditor/SKILL.md && echo 'Skill file found'", timeout: 15 },
+    ],
+    uninstallSteps: [
+      { id: "remove-skills", label: "Remove copied skill files", type: "command", command: "rm -rf $MULTICLAW_SKILLS_DIR/solidity-auditor 2>/dev/null; echo 'Skills removed'", timeout: 15 },
+    ],
+    healthChecks: [
+      { type: "file-exists", filePath: "$PLUGIN_DIR/repo/solidity-auditor/SKILL.md", description: "Solidity auditor skill file present" },
+      { type: "file-exists", filePath: "$PLUGIN_DIR/repo/solidity-auditor/references/attack-vectors/attack-vectors.md", description: "Attack vectors reference database present" },
+    ],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -255,6 +272,15 @@ export function seedPluginRegistry() {
     version: "1.0.0",
     author: "BankrBot",
     repoUrl: "https://github.com/BankrBot/claude-plugins",
+    type: "git-plugin",
+  });
+
+  upsertPlugin("solidity-auditor", {
+    name: "Solidity Auditor",
+    description: "AI-powered security auditor for Solidity smart contracts by Pashov Audit Group. Runs 8 specialized agents in parallel (vector scan, math precision, access control, economic security, execution trace, invariant, periphery, first principles) to find vulnerabilities in under 5 minutes.",
+    version: "2.0.0",
+    author: "Pashov Audit Group",
+    repoUrl: "https://github.com/pashov/skills",
     type: "git-plugin",
   });
 
