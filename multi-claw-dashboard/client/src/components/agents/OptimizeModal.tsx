@@ -2,7 +2,7 @@ interface OptimizeModalProps {
   isOpen: boolean;
   original: string;
   optimized: string;
-  intensity: string;
+  intensity: "light" | "medium" | "heavy";
   onAccept: (text: string) => void;
   onDiscard: () => void;
   onReoptimize: () => void;
@@ -40,7 +40,7 @@ export function OptimizeModal({
           </div>
           <button
             onClick={onDiscard}
-            className="text-gray-400 hover:text-white text-xl transition"
+            className="text-gray-400 hover:text-white text-xl leading-none transition"
           >
             &times;
           </button>
